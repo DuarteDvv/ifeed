@@ -3,5 +3,8 @@ name = "ifeed"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.5.4",
     "osmnx>=2.1.1",
+    "pandas>=3.0.6",
+    "pyproj>=3.8.0",
 ]

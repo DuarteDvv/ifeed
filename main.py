@@ -1,7 +1,7 @@
 import gzip
 import csv
 import osmnx as ox
-import requests
+from src.geohash.geohashing import geohash_encode, geohash_decode
 
 def read_gzip_csv(file_path):
     
@@ -15,4 +15,9 @@ def read_gzip_csv(file_path):
 
 data = read_gzip_csv('data/bares_final.csv.gz')
 
-print(data[0])
+print(float(data[0]['latitude']), float(data[0]['longitude']))
+print(float(data[1]['latitude']), float(data[1]['longitude']))
+print(geohash_encode(float(data[0]['latitude']), float(data[0]['longitude']), 8))
+print(geohash_encode(float(data[1]['latitude']), float(data[1]['longitude']), 8))
+print(geohash_decode(geohash_encode(float(data[0]['latitude']), float(data[0]['longitude']), 8)))
+print(geohash_decode(geohash_encode(float(data[1]['latitude']), float(data[1]['longitude']), 8)))
