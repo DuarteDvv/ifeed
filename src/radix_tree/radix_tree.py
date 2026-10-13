@@ -1,6 +1,5 @@
 """ Implementação de uma árvore radix (ou trie compacta) para armazenar chaves (geohashes) e seus respectivos IDs
 """
-
 from radix_tree.node import RadixTreeNode
 
 class RadixTree:
@@ -77,7 +76,7 @@ class RadixTree:
 
         ids = list(node.ids)
         for child_node in node.children.values():
-            ids.extend(self._collect_ids(child_node)) # como as outras listas estão vazias tudo bem fazer isso
+            ids.extend(self._collect_ids(child_node)) # junta os IDs das folhas abaixo do nó filho
         return ids
 
     def search_prefix(self, key):
@@ -111,13 +110,12 @@ class RadixTree:
 
         return self._collect_ids(current_node)
 
-    def create_radix_tree(self, keys_with_ids):
-        """cria uma árvore radix a partir de uma lista de tuplas (chave, id)"""
+    
 
-        for key, id in keys_with_ids:
-            self.insert(key, id)
 
-        return self
+
+
+   
 
     
 

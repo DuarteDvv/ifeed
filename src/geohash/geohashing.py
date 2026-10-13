@@ -36,9 +36,8 @@ def geohash_encode(latitude: float, longitude: float, size: int = 8) -> str:
 
     return "".join(characters)
 
-
-def geohash_decode(geohash: str) -> tuple[float, float]:
-    """converte um geohash para (latitude, longitude)"""
+def geohash_decode_bounds(geohash: str) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Converte um geohash para os limites de latitude e longitude da box delimitadora"""
     latitude_bounds = [-90.0, 90.0]
     longitude_bounds = [-180.0, 180.0]
     is_longitude = True
@@ -57,6 +56,43 @@ def geohash_decode(geohash: str) -> tuple[float, float]:
 
             is_longitude = not is_longitude
 
+    return (latitude_bounds[0], latitude_bounds[1]), (longitude_bounds[0], longitude_bounds[1])
+
+def geohash_decode(geohash: str) -> tuple[float, float]:
+    """converte um geohash para (latitude, longitude)"""
+    latitude_bounds, longitude_bounds = geohash_decode_bounds(geohash)
+
     latitude = (latitude_bounds[0] + latitude_bounds[1]) / 2
     longitude = (longitude_bounds[0] + longitude_bounds[1]) / 2
     return latitude, longitude
+
+def get_geohash_grid(key):
+    """Retorna o centro do geohash dos 8 vizinhos do geohash fornecido. 
+    - Poderia ter o caso de estarmos no limite das coordenadas, então alguns vizinhos poderiam não existir mas por 
+    pelo fato de ser apenas belo horizonte isso não é um problema
+    """
+
+    prefix_6 = key[:6]
+
+    ((lat_min, lat_max), (lon_min, lon_max)) = geohash_decode_bounds(prefix_6)
+    altura_box = lat_max - lat_min
+    largura_box = lon_max - lon_min
+
+    # centro do geohash
+    lat_centro = (lat_min + lat_max) / 2
+    lon_centro = (lon_min + lon_max) / 2
+
+    # vizinhos
+    vizinhos = [
+        (lat_centro + altura_box, lon_centro - largura_box), # norte oeste
+        (lat_centro + altura_box, lon_centro), # norte
+        (lat_centro + altura_box, lon_centro + largura_box), # norte leste
+        (lat_centro, lon_centro - largura_box), # oeste
+        (lat_centro, lon_centro + largura_box), # leste
+        (lat_centro - altura_box, lon_centro - largura_box), # sul oeste
+        (lat_centro - altura_box, lon_centro), # sul
+        (lat_centro - altura_box, lon_centro + largura_box) # sul leste
+    ]
+
+    return [geohash_encode(lat, lon, size=6) for lat, lon in vizinhos] + [prefix_6]  
+
