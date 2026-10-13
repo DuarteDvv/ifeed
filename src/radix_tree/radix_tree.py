@@ -72,11 +72,52 @@ class RadixTree:
 
                 return
 
-            def create_radix_tree(self, keys_with_ids):
-                """cria uma árvore radix a partir de uma lista de tuplas (chave, id)"""
+    def _collect_ids(self, node):
+        """Retorna os IDs armazenados nas folhas abaixo do nó."""
 
-                for key, id in keys_with_ids:
-                    self.insert(key, id)
+        ids = list(node.ids)
+        for child_node in node.children.values():
+            ids.extend(self._collect_ids(child_node)) # como as outras listas estão vazias tudo bem fazer isso
+        return ids
 
-                return self
+    def search_prefix(self, key):
+        """Buscar IDs de um prefixo especifico, ou seja, subarvores"""
+
+        if key is None or key == "":
+            return None
+
+        current_node = self.root
+        while key:
+            child_node = current_node.get_child(key[0])
+
+            if child_node is None:
+                return []
+
+            longest_common_prefix = self._common_prefix(key, child_node.segment)
+            common_prefix_size = len(longest_common_prefix)
+            size_of_child_segment = len(child_node.segment)
+
+            if common_prefix_size == len(key):
+                # achou o prefixo inteiro
+                return self._collect_ids(child_node)
+
+            if common_prefix_size < size_of_child_segment:
+                # o prefixo não existe na arvore
+                return []
+
+            # prefixo comum == segmento do child, ou seja, consumimos ele e vamos para o proximo
+            key = key[common_prefix_size:]
+            current_node = child_node
+
+        return self._collect_ids(current_node)
+
+    def create_radix_tree(self, keys_with_ids):
+        """cria uma árvore radix a partir de uma lista de tuplas (chave, id)"""
+
+        for key, id in keys_with_ids:
+            self.insert(key, id)
+
+        return self
+
+    
 
