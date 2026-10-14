@@ -9,4 +9,6 @@ class Bar:
         self.bairro = bairro
         self.latitude = latitude
         self.longitude = longitude
+        self.geohash = None
+        
 

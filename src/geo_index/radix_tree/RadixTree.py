@@ -1,6 +1,6 @@
 """ Implementação de uma árvore radix (ou trie compacta) para armazenar chaves (geohashes) e seus respectivos IDs
 """
-from radix_tree.node import RadixTreeNode
+from src.geo_index.radix_tree.Node import RadixTreeNode
 
 class RadixTree:
     def __init__(self):

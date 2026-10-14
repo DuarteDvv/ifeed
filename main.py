@@ -1,7 +1,7 @@
 import gzip
 import csv
 import osmnx as ox
-from src.geohash.geohashing import geohash_encode, geohash_decode
+from src.geo_index.geohash.geohashing import geohash_encode, geohash_decode
 
 def read_gzip_csv(file_path):
     
