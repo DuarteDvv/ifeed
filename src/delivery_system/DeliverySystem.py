@@ -29,11 +29,14 @@ class DeliverySystem:
         pass
 
     def search_nearby(self, bar_id, radius=1000):
-        """Faz a busca de entregadores próximos ao bar, com raio informado em metros
+        """Busca entregadores próximos ao bar, com raio informado em metros.
+
+        Retorna None se o bar não existir ou não tiver coordenadas.
+        Retorna uma lista, possivelmente vazia, para consultas válidas.
         """
         bar = self.get_bar(bar_id)
         if bar is None or bar.latitude is None or bar.longitude is None:
-            return []
+            return None
 
         restaurant_location = (bar.latitude, bar.longitude)
         bar_geohash = bar.geohash

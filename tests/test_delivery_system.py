@@ -1,0 +1,79 @@
+"""Execute na raiz, com o ambiente ativado: python3 tests/test_delivery_system.py
+"""
+
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.delivery_system.DeliverySystem import DeliverySystem
+from src.geo_index.geohash.geohashing import geohash_encode
+from src.models.Rider import Rider
+
+
+print("Teste 1 - Carregamento do CSV e do grafo reais")
+print("Entrada: DeliverySystem(), usando os arquivos de data/")
+system = DeliverySystem()
+print("Saída esperada:", {"bares": 20859, "nos": 32255, "arestas": 82877})
+print("Saída obtida:", {
+    "bares": len(system.bars),
+    "nos": system.road_network.number_of_nodes(),
+    "arestas": system.road_network.number_of_edges(),
+})
+
+print("\nTeste 2 - Bar real com coordenadas, mas sem entregadores cadastrados")
+bar = system.get_bar(12)
+print("Entrada: search_nearby(12, radius=200)")
+print("Bar:", bar.nome, "Coordenadas:", (bar.latitude, bar.longitude))
+print("Saída esperada:", [])
+print("Saída obtida:", system.search_nearby(12, radius=200))
+
+print("\nTeste 3 - Estabelecimento real sem coordenadas")
+bar_without_coordinates = system.get_bar(3866)
+print("Entrada: search_nearby(3866, radius=200)")
+print("Bar:", bar_without_coordinates.nome)
+print("Coordenadas:", (bar_without_coordinates.latitude, bar_without_coordinates.longitude))
+print("Saída esperada:", None)
+print("Saída obtida:", system.search_nearby(3866, radius=200))
+
+print("\nTeste 4 - ID de estabelecimento inexistente")
+print("Entrada: search_nearby(-1, radius=200)")
+print("Saída esperada:", None)
+print("Saída obtida:", system.search_nearby(-1, radius=200))
+
+print("\nTeste 5 - Entregadores artificiais em nós do grafo real")
+print("Entrada: bar 12, raio de 200 metros")
+print("Entregador 101: próximo; 102: fora do raio; 103: distante da região de busca")
+rider_nodes = [(101, 101043556), (102, 4988365536), (103, 32448892)]
+
+for rider_id, node_id in rider_nodes:
+    node = system.road_network.nodes[node_id]
+    rider = Rider(rider_id, node["y"], node["x"])
+    rider.geohash = geohash_encode(rider.latitude, rider.longitude, size=8)
+    system.riders[rider.id] = rider
+    system.radix_tree.insert(rider.geohash, rider.id)
+    print(f"Entregador {rider.id}: nó {node_id}, coordenadas {(rider.latitude, rider.longitude)}")
+
+expected = [
+    {
+        "id": 101,
+        "latitude": -19.8441013,
+        "longitude": -43.9618594,
+        "distance": 104.59,
+        "within_range": True,
+        "road_distance": 575.15,
+        "estimated_time": 0.88,
+    },
+    {
+        "id": 102,
+        "latitude": -19.8407988,
+        "longitude": -43.963161,
+        "distance": 321.13,
+        "within_range": False,
+        "road_distance": 577.16,
+        "estimated_time": 0.89,
+    },
+]
+print("Saída esperada (ordenada por ID):", expected)
+results = system.search_nearby(12, radius=200)
+print("Saída obtida (ordenada por ID):", sorted(results, key=lambda result: result["id"]))
