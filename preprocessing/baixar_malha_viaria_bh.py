@@ -1,35 +1,38 @@
 #!/usr/bin/env python3
-"""Baixa uma única vez o grafo de ruas transitáveis de Belo Horizonte
+"""Baixa o grafo de Belo Horizonte e salva velocidades e tempos de viagem.
 """
 
-from pathlib import Path
+import os
 import osmnx as ox
 
 
 def main():
-    road_network_path = Path(__file__).resolve().parents[1] / "data" / "malha_viaria_bh.graphml"
+    road_network_path = "data/malha_viaria_bh.graphml"
+    os.makedirs("data", exist_ok=True)
+    ox.settings.cache_folder = "data/.osmnx_cache"
 
-    if road_network_path.is_file():
-        print(f"Grafo já existe: {road_network_path}. Download dispensado.")
-        return
+    if os.path.isfile(road_network_path):
+        print("Carregando a malha viária já salva...")
+        road_network = ox.load_graphml(filepath=road_network_path)
+    else:
+        print("Baixando a malha viária de Belo Horizonte...")
+        road_network = ox.graph_from_place(
+            "Belo Horizonte, Minas Gerais, Brazil",
+            network_type="drive",
+            simplify=True,
+        )
 
-    road_network_path.parent.mkdir(parents=True, exist_ok=True)
-    ox.settings.cache_folder = road_network_path.parent / ".osmnx_cache"
+    print("Adicionando velocidades e tempos de viagem...")
+    road_network = ox.routing.add_edge_speeds(road_network)
+    road_network = ox.routing.add_edge_travel_times(road_network)
 
-    print("Baixando a malha viária de Belo Horizonte...")
-    road_network = ox.graph_from_place(
-        "Belo Horizonte, Minas Gerais, Brazil",
-        network_type="drive",
-        simplify=True,
-    )
-
-
-    temporary_path = road_network_path.with_suffix(".graphml.tmp")
+    temporary_path = road_network_path + ".tmp"
     try:
         ox.save_graphml(road_network, filepath=temporary_path)
-        temporary_path.replace(road_network_path)
+        os.replace(temporary_path, road_network_path)
     finally:
-        temporary_path.unlink(missing_ok=True)
+        if os.path.exists(temporary_path):
+            os.remove(temporary_path)
 
     print(f"Grafo salvo em: {road_network_path}")
     print(f"Nós: {road_network.number_of_nodes()}; arestas: {road_network.number_of_edges()}")
