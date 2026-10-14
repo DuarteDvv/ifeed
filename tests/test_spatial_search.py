@@ -53,12 +53,15 @@ graph.add_edge(1, 2, length=400.0, travel_time=20.0)
 graph.add_edge(2, 0, length=800.0, travel_time=30.0)
 candidates = [
     {"id": 101, "latitude": -19.921, "longitude": -43.94, "distance": 111.19, "within_range": True},
+    {"id": 102, "latitude": -19.9205, "longitude": -43.94, "distance": 55.6, "within_range": True},
 ]
-print("Entrada: entregador no nó 1, bar no nó 0")
+print("Entrada: entregadores 101 no nó 1 e 102 no nó 2; bar no nó 0")
 print("Rotas: 1 -> 0 = 300 m / 120 s; 1 -> 2 -> 0 = 1200 m / 50 s")
 expected = [
     {"id": 101, "latitude": -19.921, "longitude": -43.94, "distance": 111.19,
      "within_range": True, "road_distance": 1200.0, "estimated_time": 0.83},
+    {"id": 102, "latitude": -19.9205, "longitude": -43.94, "distance": 55.6,
+     "within_range": True, "road_distance": 800.0, "estimated_time": 0.5},
 ]
 print("Saída esperada:", expected)
 print("Saída obtida:", osm_distance_and_time(graph, candidates, (-19.92, -43.94)))

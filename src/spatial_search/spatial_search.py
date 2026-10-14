@@ -48,22 +48,29 @@ def classify_candidates(candidates, restaurant_location, radius):
 
 
 def osm_distance_and_time(road_network, candidates, restaurant_location):
-    """Adiciona distância em metros e tempo em minutos da rota mais rápida.
+    """Calcula rotas em lote, com distância em metros e tempo em minutos.
     """
+    if not candidates:
+        return []
 
     bar_latitude, bar_longitude = restaurant_location
-    bar_node = ox.distance.nearest_nodes(road_network, X=bar_longitude, Y=bar_latitude)
+    longitudes = [bar_longitude] + [candidate["longitude"] for candidate in candidates]
+    latitudes = [bar_latitude] + [candidate["latitude"] for candidate in candidates]
+
+    # O primeiro nó é o bar; os demais são os entregadores, na ordem de entrada.
+    nodes = ox.distance.nearest_nodes(road_network, X=longitudes, Y=latitudes)
+    bar_node = nodes[0]
+    rider_nodes = list(nodes[1:])
+
+    routes = ox.routing.shortest_path(
+        road_network,
+        orig=rider_nodes,
+        dest=[bar_node] * len(rider_nodes),
+        weight="travel_time",
+    )
 
     results = []
-    for candidate in candidates:
-        rider_node = ox.distance.nearest_nodes(
-            road_network, X=candidate["longitude"], Y=candidate["latitude"]
-        )
-
-        route = ox.routing.shortest_path(
-            road_network, rider_node, bar_node, weight="travel_time"
-        )
-
+    for candidate, route in zip(candidates, routes):
         result = {**candidate, "road_distance": None, "estimated_time": None}
 
         if route is not None:
