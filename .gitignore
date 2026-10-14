@@ -208,6 +208,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Respostas intermediárias do OSMnx
+data/.osmnx_cache/
+
 # PyPI configuration file
 .pypirc
 
