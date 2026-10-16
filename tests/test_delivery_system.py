@@ -77,3 +77,18 @@ expected = [
 print("Saída esperada (ordenada por ID):", expected)
 results = system.search_nearby(12, radius=200)
 print("Saída obtida (ordenada por ID):", sorted(results, key=lambda result: result["id"]))
+
+print("\nTeste 6 - generate_riders com distribuição normal em torno dos bares")
+generated = system.generate_riders(num_riders=1000, std_dev_meters=300.0, seed=123, clear_existing=True)
+print("Quantidade gerada:", len(generated))
+print("Quantidade no sistema (riders):", len(system.riders))
+print("IDs únicos e no intervalo 1..1000:", set(system.riders.keys()) == set(range(1, 1001)))
+print("Exemplo de entregador gerado:", {
+    "id": generated[0].id,
+    "latitude": round(generated[0].latitude, 6),
+    "longitude": round(generated[0].longitude, 6),
+    "geohash": generated[0].geohash,
+})
+nearby_generated = system.search_nearby(12, radius=1000)
+print(f"Entregadores próximos ao bar 12 (raio 1000m): {len(nearby_generated)}")
+

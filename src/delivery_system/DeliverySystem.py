@@ -2,6 +2,7 @@ import csv
 import gzip
 from osmnx import load_graphml
 
+from src.generation.rider_generation import generate_riders_data
 from src.geo_index.radix_tree.RadixTree import RadixTree
 from src.models.Rider import Rider
 from src.models.Bar import Bar
@@ -22,11 +23,39 @@ class DeliverySystem:
     def get_bar(self, bar_id):
         return self.bars.get(bar_id)
     
-    def generate_riders(self, num_riders):
-        """Gera um número especificado de entregadores com IDs únicos"""
-        # TODO DUDU
+    def generate_riders(
+        self,
+        num_riders: int,
+        std_dev_meters: float = 500.0,
+        seed: int | None = None,
+        clear_existing: bool = False,
+    ) -> list[Rider]:
+        """gera entregadores distribuídos homogeneamente entre os bares disponíveis,
+        posicionados conforme distribuição Normal em metros em torno de cada bar
+        """
+        if num_riders <= 0:
+            return []
 
-        pass
+        if clear_existing:
+            self.riders = {}
+            self.radix_tree = RadixTree()
+            start_id = 1
+        else:
+            start_id = max(self.riders.keys(), default=0) + 1
+
+        generated_riders = generate_riders_data(
+            bars=self.bars.values(),
+            num_riders=num_riders,
+            std_dev_meters=std_dev_meters,
+            start_id=start_id,
+            seed=seed,
+        )
+
+        for rider in generated_riders:
+            self.riders[rider.id] = rider
+            self.radix_tree.insert(rider.geohash, rider.id)
+
+        return generated_riders
 
     def search_nearby(self, bar_id, radius=1000):
         """Busca entregadores próximos ao bar, com raio informado em metros.
