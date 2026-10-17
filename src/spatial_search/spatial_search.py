@@ -3,8 +3,19 @@
 import osmnx as ox
 
 from src.geo_index.geohash.geohashing import get_geohash_neighbors
+from src.geometry.geometry_utilities import (
+    EARTH_RADIUS,
+    classify_candidates,
+    haversine_distance,
+)
 
-EARTH_RADIUS = 6_371_000  # metros
+__all__ = [
+    "EARTH_RADIUS",
+    "search_candidates",
+    "haversine_distance",
+    "classify_candidates",
+    "osm_distance_and_time",
+]
 
 
 def search_candidates(tree, bar_geohash):
@@ -21,35 +32,8 @@ def search_candidates(tree, bar_geohash):
     return list(dict.fromkeys(candidate_ids))
 
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """distância geométrica em metros usando Haversine do OSMnx"""
-
-    return float(ox.distance.great_circle(lat1, lon1, lat2, lon2, earth_radius=EARTH_RADIUS))
-
-
-def classify_candidates(candidates, restaurant_location, radius):
-    """Classifica entregadores por Haversine, com raio informado em metros."""
-    results = []
-    for rider in candidates:
-        
-        distance = haversine_distance(
-            restaurant_location[0], restaurant_location[1], rider.latitude, rider.longitude
-        )
-        
-        results.append({
-            "id": rider.id,
-            "latitude": rider.latitude,
-            "longitude": rider.longitude,
-            "distance": round(distance, 2),
-            "within_range": distance <= radius,
-        })
-
-    return results
-
-
 def osm_distance_and_time(road_network, candidates, restaurant_location):
-    """Calcula rotas em lote, com distância em metros e tempo em minutos.
-    """
+    """Calcula rotas em lote, com distância em metros e tempo em minutos."""
     if not candidates:
         return []
 

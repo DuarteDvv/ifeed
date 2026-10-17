@@ -2,58 +2,22 @@
 
 import heapq
 import math
-import numpy as np
 
 from src.generation.kd_tree.Node import KDTreeNode
+from src.geometry.geometry_utilities import (
+    get_axis_coord,
+    split_points_by_median,
+    squared_distance,
+    unpack_point,
+)
 
-
-def unpack_point(item):
-    "separa as coordenadas dos dados adicionais associados ao ponto"
-
-    # se o item é um nodo de KD-tree
-    if isinstance(item, KDTreeNode):
-        return item.coords, item.data
-
-    # se o item for um ponto com dados além de coordenadas, por exemplo ((coordenadas), dados)
-    if isinstance(item, (tuple, list)) and len(item) == 2 and isinstance(item[0], (tuple, list)):
-        return tuple(item[0]), item[1]
-
-    # se o item for um ponto que só tem coordenadas
-    if isinstance(item, (tuple, list)):
-        return tuple(item), None
-    
-    return item, None
-
-
-def get_axis_coord(item, axis):
-    "obtém o valor da coordenada no eixo de corte informado"
-
-    coords, _ = unpack_point(item)
-    return coords[axis]
-
-
-def squared_distance(coord_a, coord_b):
-    return sum((a - b) ** 2 for a, b in zip(coord_a, coord_b))
-
-
-def split_points_by_median(points, axis):
-    mid = len(points) // 2
-    if len(points) <= 1:
-        return [], points[0], []
-
-    # escolhendo a coordenada do eixo atual para ordenar baseado nela
-    dtype = [("coord", float), ("item", object)]
-    pairs = np.empty(len(points), dtype=dtype)
-    for i, p in enumerate(points):
-        pairs[i] = (get_axis_coord(p, axis), p)
-
-    partitioned = np.partition(pairs, mid, order="coord")
-
-    left_points = list(partitioned[:mid]["item"])
-    median_item = partitioned[mid]["item"]
-    right_points = list(partitioned[mid + 1:]["item"])
-
-    return left_points, median_item, right_points
+__all__ = [
+    "KDTree",
+    "squared_distance",
+    "split_points_by_median",
+    "unpack_point",
+    "get_axis_coord",
+]
 
 
 class KDTree:

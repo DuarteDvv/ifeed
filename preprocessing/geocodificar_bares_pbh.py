@@ -13,9 +13,10 @@ import argparse
 import re
 import unicodedata
 from collections import defaultdict
-import numpy as np
 import pandas as pd
 from pyproj import Transformer
+
+from src.geometry.geometry_utilities import median_geometric
 
 ALIASES = {"AVE": "AVENIDA", "AV": "AVENIDA", "R": "RUA", "PCA": "PRACA", "PRA": "PRACA", "PC": "PRACA", "ROD": "RODOVIA", "AL": "ALAMEDA", "TRV": "TRAVESSA", "TV": "TRAVESSA", "EST": "ESTRADA"}
 
@@ -42,23 +43,6 @@ def parse_geom(value):
     if not m:
         return None
     return (float(m.group(1)), float(m.group(2)))
-
-def median_geometrica(points):
-    """Algoritmo de Weiszfeld em coordenadas UTM (metros)."""
-    pts = np.asarray(points, dtype=float)
-    if len(pts) == 1:
-        return pts[0]
-    estimate = np.median(pts, axis=0)
-    for _ in range(300):
-        distances = np.linalg.norm(pts - estimate, axis=1)
-        if np.min(distances) < 1e-8:
-            return pts[np.argmin(distances)]
-        weights = 1.0 / distances
-        new = (pts * weights[:, None]).sum(axis=0) / weights.sum()
-        if np.linalg.norm(new - estimate) < 1e-7:
-            return new
-        estimate = new
-    return estimate
 
 def preparar_pbh(df):
     df = df.copy()
@@ -110,7 +94,7 @@ def main():
         record.update(latitude="", longitude="", PRECISAO_COORD="nao_encontrado")
         if options:
             points = sorted(options)
-            xy = median_geometrica(points)
+            xy = median_geometric(points)
             lon, lat = transform.transform(float(xy[0]), float(xy[1]))
             record.update(latitude=lat, longitude=lon, PRECISAO_COORD="exato_cadastral" if len(points)==1 else "aproximado_mediana")
         results.append(record)

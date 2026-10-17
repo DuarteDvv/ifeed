@@ -12,6 +12,15 @@ import os
 import osmnx as ox
 import pandas as pd
 from shapely.geometry import LineString
+from src.geometry.geometry_utilities import split_at_middle
+
+__all__ = [
+    "obter_geometria_aresta",
+    "split_at_middle",
+    "bipartir_segmento",
+    "segmentar_aresta",
+    "gerar_dataset_pontos_ruas",
+]
 
 
 def obter_geometria_aresta(u, v, edge_data, nodes):
@@ -25,24 +34,29 @@ def obter_geometria_aresta(u, v, edge_data, nodes):
     return LineString([u_coords, v_coords])
 
 
-def bipartir_segmento(geom, t_inicio, t_fim, comprimento_atual, max_comprimento, pontos):
+def bipartir_segmento(geom, *args):
     "biparte recursivamente um segmento no ponto médio até atingir o comprimento máximo"
+    if len(args) == 3:
+        comprimento_atual, max_comprimento, pontos = args
+    elif len(args) == 5:
+        _, _, comprimento_atual, max_comprimento, pontos = args
+    else:
+        raise TypeError(f"bipartir_segmento esperava 4 ou 6 argumentos, recebeu {len(args) + 1}")
 
-    t_meio = (t_inicio + t_fim) / 2.0
-    ponto = geom.interpolate(t_meio, normalized=True) # pega o ponto médio da rua mesmo que ela seja curva
+    ponto, geom_esq, geom_dir = split_at_middle(geom)
     pontos.append(ponto)
 
     comprimento_subaresta = comprimento_atual / 2.0
     if comprimento_subaresta > max_comprimento:
-        bipartir_segmento(geom, t_inicio, t_meio, comprimento_subaresta, max_comprimento, pontos)
-        bipartir_segmento(geom, t_meio, t_fim, comprimento_subaresta, max_comprimento, pontos)
+        bipartir_segmento(geom_esq, comprimento_subaresta, max_comprimento, pontos)
+        bipartir_segmento(geom_dir, comprimento_subaresta, max_comprimento, pontos)
 
 
 def segmentar_aresta(geom, comprimento, max_comprimento=50.0):
     "gera pontos de segmentação para uma aresta a partir de bipartição sucessiva"
     pontos = []
     comprimento_valido = max(float(comprimento or 0.0), 0.0)
-    bipartir_segmento(geom, 0.0, 1.0, comprimento_valido, max_comprimento, pontos)
+    bipartir_segmento(geom, comprimento_valido, max_comprimento, pontos)
     return pontos
 
 
@@ -118,4 +132,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
