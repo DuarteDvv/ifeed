@@ -7,7 +7,7 @@ from src.geo_index.radix_tree.RadixTree import RadixTree
 from src.models.Rider import Rider
 from src.models.Bar import Bar
 from src.geo_index.geohash.geohashing import geohash_encode
-from src.spatial_search.spatial_search import classify_candidates, osm_distance_and_time, search_candidates
+from src.spatial_search.spatial_search import classify_candidates_by_distance, osm_distance_and_time, search_candidates
 
 
 class DeliverySystem:
@@ -49,6 +49,7 @@ class DeliverySystem:
             std_dev_meters=std_dev_meters,
             start_id=start_id,
             seed=seed,
+            road_network=getattr(self, "road_network", None),
         )
 
         for rider in generated_riders:
@@ -76,7 +77,7 @@ class DeliverySystem:
             rider = self.get_rider(candidate_id)
             candidates.append(rider)
 
-        classified = classify_candidates(candidates, restaurant_location, radius)
+        classified = classify_candidates_by_distance(candidates, restaurant_location, radius)
         results = osm_distance_and_time(self.road_network, classified, restaurant_location)
         
         return results

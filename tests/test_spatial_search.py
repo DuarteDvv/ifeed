@@ -10,7 +10,7 @@ import networkx as nx
 from src.geo_index.radix_tree.RadixTree import RadixTree
 from src.models.Rider import Rider
 from src.spatial_search.spatial_search import (
-    classify_candidates,
+    classify_candidates_by_distance,
     haversine_distance,
     osm_distance_and_time,
     search_candidates,
@@ -41,7 +41,7 @@ expected = [
     {"id": 102, "latitude": -19.923, "longitude": -43.94, "distance": 333.58, "within_range": False},
 ]
 print("Saída esperada:", expected)
-print("Saída obtida:", classify_candidates(riders, (-19.92, -43.94), 200))
+print("Saída obtida:", classify_candidates_by_distance(riders, (-19.92, -43.94), 200))
 
 print("\nTeste 4 - Distância e tempo da rota mais rápida")
 graph = nx.MultiDiGraph(crs="EPSG:4326")

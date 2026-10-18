@@ -12,10 +12,12 @@ import numpy as np
 from shapely.geometry import LineString
 
 from src.geometry.geometry_utilities import (
-    classify_candidates,
+    classify_candidates_by_distance,
     haversine_distance,
     hypot,
     median_geometric,
+    project_point_on_segment,
+    project_point_on_street,
     split_at_middle,
     split_points_by_median,
     squared_distance,
@@ -45,13 +47,13 @@ assert round(h_dist, 2) == 111194.93
 print(f"OK: haversine_distance obtido {round(h_dist, 2)}")
 
 
-print("\nTeste 4 - classify_candidates")
+print("\nTeste 4 - classify_candidates_by_distance")
 riders = [Rider(1, -19.921, -43.94), Rider(2, -19.923, -43.94)]
-classified = classify_candidates(riders, (-19.92, -43.94), radius=200)
+classified = classify_candidates_by_distance(riders, (-19.92, -43.94), radius=200)
 assert len(classified) == 2
 assert classified[0]["within_range"] is True
 assert classified[1]["within_range"] is False
-print("OK: classify_candidates com Rider objects")
+print("OK: classify_candidates_by_distance com Rider objects")
 
 
 print("\nTeste 5 - median_geometric (Weiszfeld)")
@@ -77,5 +79,28 @@ assert math.isclose(hypot(3.0, 4.0), 5.0)
 assert math.isclose(hypot(0.0, 0.0), 0.0)
 assert math.isclose(hypot(-3.0, -4.0), 5.0)
 print("OK: hypot calcula hipotenusa corretamente")
+
+
+print("\nTeste 8 - project_point_on_segment")
+# projeção no interior do segmento horizontal (0, 0) -> (10, 0)
+proj_mid = project_point_on_segment((3.5, 4.0), (0.0, 0.0), (10.0, 0.0))
+assert proj_mid == (3.5, 0.0)
+# projeção limitada à extremidade inicial (t < 0)
+proj_start = project_point_on_segment((-5.0, 2.0), (0.0, 0.0), (10.0, 0.0))
+assert proj_start == (0.0, 0.0)
+# projeção limitada à extremidade final (t > 1)
+proj_end = project_point_on_segment((15.0, -3.0), (0.0, 0.0), (10.0, 0.0))
+assert proj_end == (10.0, 0.0)
+print("OK: project_point_on_segment calcula projeção e respeita limites do segmento")
+
+
+print("\nTeste 9 - project_point_on_street")
+# rua em formato de L: (0, 0) -> (0, 10) -> (10, 10)
+rua_l = [(0.0, 0.0), (0.0, 10.0), (10.0, 10.0)]
+proj_seg1 = project_point_on_street((2.0, 3.0), rua_l)
+assert proj_seg1 == (0.0, 3.0)
+proj_seg2 = project_point_on_street((6.0, 12.0), rua_l)
+assert proj_seg2 == (6.0, 10.0)
+print("OK: project_point_on_street escolhe o subsegmento mais próximo na rua")
 
 print("\nTodos os testes de geometry_utilities passaram com sucesso!")

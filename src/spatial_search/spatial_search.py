@@ -5,7 +5,7 @@ import osmnx as ox
 from src.geo_index.geohash.geohashing import get_geohash_neighbors
 from src.geometry.geometry_utilities import (
     EARTH_RADIUS,
-    classify_candidates,
+    classify_candidates_by_distance,
     haversine_distance,
 )
 
@@ -13,7 +13,7 @@ __all__ = [
     "EARTH_RADIUS",
     "search_candidates",
     "haversine_distance",
-    "classify_candidates",
+    "classify_candidates_by_distance",
     "osm_distance_and_time",
 ]
 

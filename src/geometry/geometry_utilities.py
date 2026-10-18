@@ -11,8 +11,10 @@ __all__ = [
     "split_at_middle",
     "hypot",
     "squared_distance",
+    "project_point_on_segment",
+    "project_point_on_street",
     "haversine_distance",
-    "classify_candidates",
+    "classify_candidates_by_distance",
     "median_geometric",
     "unpack_point",
     "get_axis_coord",
@@ -29,7 +31,64 @@ def hypot(dx, dy):
 
 def squared_distance(coord_a, coord_b):
     "calcula a distância euclidiana ao quadrado entre dois pontos"
+    if len(coord_a) == 2 and len(coord_b) == 2:
+        dx = coord_a[0] - coord_b[0]
+        dy = coord_a[1] - coord_b[1]
+        return dx * dx + dy * dy
     return sum((a - b) ** 2 for a, b in zip(coord_a, coord_b))
+
+
+def project_point_on_segment(point, seg_start, seg_end):
+    "calcula a projeção ortogonal de um ponto sobre um segmento de reta"
+    px, py = point
+    x1, y1 = seg_start
+    x2, y2 = seg_end
+
+    dx = x2 - x1
+    dy = y2 - y1
+    seg_len_sq = dx * dx + dy * dy
+
+    # se os extremos do segmento coincidirem, retorna a própria extremidade
+    if seg_len_sq == 0.0:
+        return (float(x1), float(y1))
+
+    # parâmetro escalar t da projeção vetorial restrito ao intervalo [0, 1]
+    t = ((px - x1) * dx + (py - y1) * dy) / seg_len_sq
+    t = max(0.0, min(1.0, t))
+
+    proj_x = x1 + t * dx
+    proj_y = y1 + t * dy
+    return (float(proj_x), float(proj_y))
+
+
+def project_point_on_street(point, geom):
+    "calcula a projeção de um ponto sobre uma rua composta por um ou mais segmentos"
+    if isinstance(geom, (list, tuple)):
+        coords = geom
+    elif hasattr(geom, "coords"):
+        coords = list(geom.coords)
+    else:
+        raise TypeError(f"geometria inválida: {type(geom)}")
+
+    if not coords:
+        return (float(point[0]), float(point[1]))
+    if len(coords) == 1:
+        return (float(coords[0][0]), float(coords[0][1]))
+    if len(coords) == 2:
+        return project_point_on_segment(point, coords[0], coords[1])
+
+    # avalia a projeção em cada subsegmento da rua e escolhe a mais próxima do ponto
+    best_proj = None
+    best_dist_sq = float("inf")
+
+    for i in range(len(coords) - 1):
+        candidate = project_point_on_segment(point, coords[i], coords[i + 1])
+        dist_sq = squared_distance(point, candidate)
+        if dist_sq < best_dist_sq:
+            best_dist_sq = dist_sq
+            best_proj = candidate
+
+    return best_proj
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -37,8 +96,9 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return float(ox.distance.great_circle(lat1, lon1, lat2, lon2, earth_radius=EARTH_RADIUS))
 
 
-def classify_candidates(candidates, restaurant_location, radius):
-    """Classifica entregadores por Haversine, com raio informado em metros."""
+def classify_candidates_by_distance(candidates, restaurant_location, radius):
+    "classifica entregadores por distância Haversine, com raio informado em metros"
+    
     results = []
     for rider in candidates:
         r_id = getattr(rider, "id", None) if not isinstance(rider, dict) else rider.get("id")
@@ -145,46 +205,44 @@ def median_geometric(points):
     return estimate
 
 
-# ==============================================================================
-# 4. Particionamento Espacial e Eixos
-# ==============================================================================
-
 def unpack_point(item):
     "separa as coordenadas dos dados adicionais associados ao ponto"
-    if hasattr(item, "coords"):
-        return item.coords, getattr(item, "data", None)
-
-    if isinstance(item, (tuple, list)) and len(item) == 2 and isinstance(item[0], (tuple, list)):
-        return tuple(item[0]), item[1]
 
     if isinstance(item, (tuple, list)):
+        if len(item) == 2 and isinstance(item[0], (tuple, list)):
+            return tuple(item[0]), item[1]
         return tuple(item), None
+
+    if hasattr(item, "coords"):
+        return item.coords, getattr(item, "data", None)
 
     return item, None
 
 
 def get_axis_coord(item, axis):
     "obtém o valor da coordenada no eixo fornecido"
+
     coords, _ = unpack_point(item)
     return coords[axis]
 
 
 def split_points_by_median(points, axis):
     "particiona pontos pela mediana ao longo do eixo fornecido"
+
     mid = len(points) // 2
     if len(points) <= 1:
         return [], points[0], []
 
     # escolhendo a coordenada do eixo atual para ordenar baseado nela
-    dtype = [("coord", float), ("item", object)]
-    pairs = np.empty(len(points), dtype=dtype)
-    for i, p in enumerate(points):
-        pairs[i] = (get_axis_coord(p, axis), p)
+    coords = np.fromiter(
+        (get_axis_coord(p, axis) for p in points),
+        dtype=float,
+        count=len(points),
+    )
+    partitioned_indices = np.argpartition(coords, mid)
 
-    partitioned = np.partition(pairs, mid, order="coord")
-
-    left_points = list(partitioned[:mid]["item"])
-    median_item = partitioned[mid]["item"]
-    right_points = list(partitioned[mid + 1:]["item"])
+    left_points = [points[i] for i in partitioned_indices[:mid]]
+    median_item = points[partitioned_indices[mid]]
+    right_points = [points[i] for i in partitioned_indices[mid + 1:]]
 
     return left_points, median_item, right_points

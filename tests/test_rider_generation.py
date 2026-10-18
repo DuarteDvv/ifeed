@@ -9,13 +9,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 
+from src.generation.kd_tree.KD_Tree import KDTree
 from src.generation.rider_generation import (
     build_rider,
     calculate_bar_quotas,
     filter_valid_bars,
     generate_riders_data,
+    get_segments_kdtree,
+    get_street_geometries,
+    project_rider_to_nearest_street,
     sample_normal_coordinates,
 )
+from src.geometry.geometry_utilities import project_point_on_street, squared_distance
 from src.models.Bar import Bar
 
 
@@ -91,7 +96,17 @@ print(f"Rider construído: id={rider.id}, lat={rider.latitude}, lon={rider.longi
 assert rider.id == 42, "ID incorreto"
 assert rider.geohash is not None and len(rider.geohash) == 8, "Geohash inválido"
 
-print("\nTeste 5 - generate_riders_data isolado")
+print("\nTeste 5 - project_rider_to_nearest_street em rua sintética")
+# rua horizontal em lat = -19.920, indo de lon = -43.950 até lon = -43.930, com ponto médio em (-19.920, -43.940)
+mock_kdtree = KDTree([((-19.920, -43.940), "rua_1")])
+mock_geometries = {"rua_1": ((-19.920, -43.950), (-19.920, -43.930))}
+rider_fora_da_rua = build_rider(rider_id=1, latitude=-19.918, longitude=-43.943)
+project_rider_to_nearest_street(rider_fora_da_rua, mock_kdtree, mock_geometries)
+print(f"Posição após projeção: ({rider_fora_da_rua.latitude}, {rider_fora_da_rua.longitude})")
+assert np.isclose(rider_fora_da_rua.latitude, -19.920), "Latitude deveria ter sido projetada para -19.920"
+assert np.isclose(rider_fora_da_rua.longitude, -43.943), "Longitude deveria ser preservada na projeção ortogonal"
+
+print("\nTeste 6 - generate_riders_data com projeção nas ruas reais de BH")
 test_bars = [
     make_bar(10, -19.92, -43.94),
     make_bar(20, -19.85, -43.96),
@@ -108,8 +123,22 @@ print("Entregadores gerados:", len(riders))
 print("IDs gerados:", [r.id for r in riders])
 assert len(riders) == 5, "Total de entregadores gerados incorreto"
 assert [r.id for r in riders] == [100, 101, 102, 103, 104], "IDs não sequenciais"
+
+kdtree_bh = get_segments_kdtree()
+geometries_bh = get_street_geometries()
 for r in riders:
     assert r.geohash is not None and len(r.geohash) == 8, "Geohash ausente"
+    # verifica se o entregador está exatamente sobre uma rua próxima da malha viária
+    nearest_candidates = kdtree_bh.find_k_nearest((r.latitude, r.longitude), k=10)
+    min_dist_sq = min(
+        squared_distance(
+            (r.latitude, r.longitude),
+            project_point_on_street((r.latitude, r.longitude), geometries_bh[node.data]),
+        )
+        for node, _ in nearest_candidates
+    )
+    assert min_dist_sq < 1e-18, f"Entregador {r.id} não está sobre uma rua (min_dist_sq={min_dist_sq})"
 
+print("OK: todos os entregadores gerados estão projetados sobre ruas reais de BH")
 print("\nTodos os testes unitários de rider_generation passaram com sucesso!")
 

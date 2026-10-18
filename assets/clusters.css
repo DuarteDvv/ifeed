@@ -1,0 +1,108 @@
+/* Personalizando cores (ex: paleta em tons de azul e roxo em vez do verde/amarelo padrão) */
+.marker-cluster-large {
+    background-color: rgba(215, 71, 159, 0.8) !important;
+}
+.marker-cluster-large div {
+    background-color: rgba(215, 71, 159, 0) !important;
+    color: white !important;
+    font-weight: bold;
+}
+
+.marker-cluster-medium {
+    background-color: rgba(236, 137, 120, 0.8) !important;
+}
+.marker-cluster-medium div {
+    background-color: rgba(236, 137, 120, 0) !important;
+    color: white !important;
+    font-weight: bold;
+}
+
+.marker-cluster-small {
+    background-color: rgba(193, 245, 108, 0.6) !important;
+}
+.marker-cluster-small div {
+    background-color: rgba(193, 245, 108, 0) !important;
+    color: rgba(0, 0, 0, 0.8) !important;
+    font-weight: bold;
+}
+
+/*d eixa a transição da barra de progresso dos entregadores imediata (sem o atraso padrão de 0.6s do bootstrap) */
+#rider-progress-bar .progress-bar {
+    transition: width 0.08s linear !important;
+}
+
+/* Clusters de entregadores em formato de losango */
+.rider-cluster {
+    background: transparent !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+.rider-cluster-diamond {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(45deg);
+    border-radius: 5px;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1;
+}
+
+/* Desfaz a rotação de 45 graus apenas no texto para que o número fique na horizontal */
+.rider-cluster-diamond span {
+    display: inline-block;
+    transform: rotate(-45deg);
+}
+
+.rider-cluster-small .rider-cluster-diamond {
+    width: 28px;
+    height: 28px;
+    background-color: rgba(255, 145, 0, 0.5);
+}
+
+.rider-cluster-medium .rider-cluster-diamond {
+    width: 32px;
+    height: 32px;
+    background-color: rgba(255, 107, 0, 0.5);
+}
+
+.rider-cluster-large .rider-cluster-diamond {
+    width: 36px;
+    height: 36px;
+    background-color: rgba(216, 67, 21, 0.5);
+}
+
+/* Estilo das seções colapsáveis (Accordion) do painel lateral */
+.accordion-button {
+    font-size: 0.92rem !important;
+    font-weight: 600 !important;
+    padding: 0.75rem 1rem !important;
+    background-color: #f8f9fa !important;
+    color: #2c3e50 !important;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: #eef2f7 !important;
+    color: #18bc9c !important;
+    box-shadow: none !important;
+}
+
+.accordion-button:focus {
+    box-shadow: none !important;
+    border-color: rgba(0, 0, 0, 0.125) !important;
+}
+
+.accordion-body {
+    padding: 0.9rem !important;
+    overflow: visible !important;
+}
+
+.accordion-collapse.show {
+    overflow: visible !important;
+}
