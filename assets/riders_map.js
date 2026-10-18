@@ -1,5 +1,17 @@
 // funções JavaScript de customização das camadas GeoJSON no Dash-Leaflet
 window.ifeed = Object.assign({}, window.ifeed, {
+    // O layeradd ocorre após montar o índice de clusters. Dois frames permitem
+    // que o navegador desenhe os pontos antes de confirmar a exibição.
+    ridersMapLayerAdded: function (event, context) {
+        var url = context.url;
+        if (!url || window.ifeed.visibleRidersUrl === url) return;
+        window.ifeed.visibleRidersUrl = url;
+        window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(function () {
+                window.dash_clientside.set_props("riders-map-visible", {data: url});
+            });
+        });
+    },
     // renderiza cada cluster de restaurantes com classes de estilo e tooltip informativa
     barClusterToLayer: function (feature, latlng) {
         var count = feature.properties.point_count;

@@ -29,12 +29,12 @@ from src.webpage.map_navigation import (
     render_bar_details,
     render_highlighted_bar_layer,
 )
+from src.webpage.map_data import EMPTY_MAP_URL, create_map_url, register_map_route
 from src.webpage.riders import (
     DEFAULT_SEARCH_RADIUS_KM,
     RIDER_CLUSTER_TO_LAYER,
     RIDER_DISCARDED_CLUSTER_TO_LAYER,
     RIDER_POINT_TO_LAYER,
-    build_riders_geojson,
     get_initialization_state,
     get_rider_generation_state,
     is_initialization_ready,
@@ -64,6 +64,11 @@ SEARCH_INDEX, BARS_BY_BAIRRO, COORDS_INDEX, BAIRRO_OPTIONS = build_bar_indices(V
 ALL_BARS_GEOJSON = build_bars_geojson(VALID_BARS)
 INITIAL_DROPDOWN_OPTIONS = [format_bar_option(b) for b in VALID_BARS[:MAX_DROPDOWN_OPTIONS]]
 
+def get_all_riders_map_url() -> str:
+    """Retorna a URL já preparada pelo gerador, sem reconstruir os pontos."""
+    return get_rider_generation_state()["map_url"] or EMPTY_MAP_URL
+
+
 # inicialização do app Dash com tema Bootstrap moderno
 app = dash.Dash(
     __name__,
@@ -72,10 +77,14 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
 )
 
+register_map_route(app.server)
+
 app.layout = dbc.Container(
     fluid=True,
     className="p-0",
     children=[
+        dcc.Store(id="riders-ready", data=False),
+        dcc.Store(id="riders-map-visible"),
         dbc.Row(
             className="g-0",
             children=[
@@ -90,7 +99,7 @@ app.layout = dbc.Container(
                         html.Div([
                             html.H4("iFeed", className="fw-bold text-primary mb-1"),
                             html.P(
-                                "Eduardo Birchal e Luís [Sobrenome]",
+                                "Eduardo Birchal e Luis Duarte",
                                 className="text-muted small mb-2",
                             ),
                             dbc.Badge(
@@ -111,6 +120,17 @@ app.layout = dbc.Container(
                             id="interval-init-progress",
                             interval=150,
                             disabled=is_initialization_ready(),
+                        ),
+
+                        dbc.Alert(
+                            [
+                                html.Strong("Primeiro, gere os entregadores."),
+                                html.Div("Na seção Entregadores, informe a quantidade e clique em Gerar Entregadores. Depois, escolha um bar no mapa ou na busca."),
+                            ],
+                            id="generate-riders-first-notice",
+                            color="warning",
+                            is_open=True,
+                            className="small mb-3",
                         ),
 
                         # seções colapsáveis: Bares e Entregadores
@@ -139,13 +159,15 @@ app.layout = dbc.Container(
                                         dcc.Dropdown(
                                             id="bar-dropdown",
                                             options=INITIAL_DROPDOWN_OPTIONS,
-                                            placeholder="Digite para buscar um bar...",
+                                            placeholder="Gere os entregadores para escolher um bar...",
+                                            disabled=True,
                                             clearable=True,
                                             searchable=True,
                                             className="mb-2 small",
                                         ),
                                         html.Small(
-                                            "Dica: digite parte do nome, rua ou ID para pesquisar entre todos os bares.",
+                                            "Gere os entregadores na aba Entregadores para liberar a seleção de bares.",
+                                            id="bar-selection-hint",
                                             className="text-muted d-block mb-3",
                                             style={"fontSize": "0.75rem"},
                                         ),
@@ -175,6 +197,7 @@ app.layout = dbc.Container(
                                         dbc.Button(
                                             "Buscar Entregadores no Raio",
                                             id="btn-search-nearby-riders",
+                                            disabled=True,
                                             color="warning",
                                             size="sm",
                                             className="w-100 fw-semibold mb-2",
@@ -189,21 +212,6 @@ app.layout = dbc.Container(
                                             className="w-100 mb-3",
                                         ),
 
-                                        # 4. detalhes do bar selecionado
-                                        html.Label(
-                                            "Bar Selecionado:",
-                                            className="fw-semibold small mb-1",
-                                        ),
-                                        html.Div(
-                                            id="bar-details-container",
-                                            children=render_bar_details(None),
-                                        ),
-
-                                        # 5. resultados da busca de entregadores no raio
-                                        html.Div(
-                                            id="nearby-search-results-container",
-                                            children=render_nearby_search_results(None),
-                                        ),
                                     ],
                                 ),
                                 dbc.AccordionItem(
@@ -216,7 +224,7 @@ app.layout = dbc.Container(
                             ],
                             always_open=True,
                             start_collapsed=True,
-                            active_item=[],
+                            active_item=["section-entregadores"],
                             flush=False,
                             className="shadow-sm",
                         ),
@@ -252,6 +260,7 @@ app.layout = dbc.Container(
                     width=12,
                     md=8,
                     lg=9,
+                    className="map-container",
                     children=[
                         dl.Map(
                             id="map-bh",
@@ -301,7 +310,8 @@ app.layout = dbc.Container(
                                                 ),
                                                 dl.GeoJSON(
                                                     id="geojson-entregadores",
-                                                    data=build_riders_geojson(SYSTEM.riders.values()),
+                                                    url=get_all_riders_map_url(),
+                                                    eventHandlers={"layeradd": {"variable": "ifeed.ridersMapLayerAdded"}},
                                                     cluster=True,
                                                     zoomToBoundsOnClick=True,
                                                     spiderfyOnMaxZoom=True,
@@ -320,11 +330,89 @@ app.layout = dbc.Container(
                                 dl.LayerGroup(id="layer-bar-selecionado"),
                             ],
                         ),
+                        html.Div(
+                            id="map-overview-legend",
+                            className="map-selection-legend map-overview-legend",
+                            hidden=False,
+                            children=[
+                                html.Strong("Legenda — visão geral", className="d-block mb-1"),
+                                html.Div([
+                                    html.Span(className="legend-symbol legend-bar-cluster-small"),
+                                    html.Span(className="legend-symbol legend-bar-cluster-medium"),
+                                    html.Span(className="legend-symbol legend-bar-cluster-large"),
+                                    "Círculos: grupos de bares",
+                                ]),
+                                html.Div([
+                                    html.Span(className="legend-symbol legend-rider"),
+                                    "Losangos laranja: grupos de entregadores",
+                                ]),
+                                html.P("O número indica quantos pontos estão agrupados.", className="mb-0 mt-2"),
+                                html.P("Cores e tamanhos variam conforme a quantidade.", className="mb-0"),
+                                html.P("Aproxime o mapa para ver os pontos separados.", className="mb-0 text-muted"),
+                            ],
+                        ),
+                        html.Div(
+                            id="map-selection-legend",
+                            className="map-selection-legend",
+                            hidden=True,
+                            children=[
+                                html.Strong("Legenda", className="d-block mb-1"),
+                                html.Div([html.Span(className="legend-symbol legend-bar"), "Bar selecionado"]),
+                                html.Div([html.Span(className="legend-symbol legend-rider"), "Entregadores dentro do raio"]),
+                                html.Div([html.Span(className="legend-symbol legend-discarded"), "Entregadores fora do raio na região"]),
+                                html.Div([html.Span(className="legend-symbol legend-radius"), "Raio de atendimento"]),
+                            ],
+                        ),
+                        html.Details(
+                            open=True,
+                            className="map-search-results map-bar-details",
+                            children=[
+                                html.Summary([
+                                    html.Span("Bar selecionado", className="fw-semibold"),
+                                    html.Span("Minimizar −", className="panel-minimize-label"),
+                                    html.Span("Expandir +", className="panel-expand-label"),
+                                ], className="map-results-toggle"),
+                                html.Div(
+                                    id="bar-details-container",
+                                    children=render_bar_details(None),
+                                ),
+                            ],
+                        ),
+                        html.Details(
+                            open=True,
+                            className="map-search-results",
+                            children=[
+                                html.Summary([
+                                    html.Span("Entregadores no raio", className="fw-semibold"),
+                                    html.Span("Minimizar −", className="panel-minimize-label"),
+                                    html.Span("Expandir +", className="panel-expand-label"),
+                                ], className="map-results-toggle"),
+                                html.Div(
+                                    id="nearby-search-results-container",
+                                    children=render_nearby_search_results(None),
+                                ),
+                            ],
+                        ),
                     ],
                 ),
             ],
         )
     ],
+)
+
+
+app.clientside_callback(
+    """function(visibleUrl, currentUrl, ready) {
+        if (ready && visibleUrl && visibleUrl === currentUrl) {
+            return "Mapa atualizado. Entregadores disponíveis para busca.";
+        }
+        return window.dash_clientside.no_update;
+    }""",
+    Output("rider-progress-text", "children", allow_duplicate=True),
+    Input("riders-map-visible", "data"),
+    Input("riders-ready", "data"),
+    State("geojson-entregadores", "url"),
+    prevent_initial_call=True,
 )
 
 
@@ -347,15 +435,65 @@ def toggle_riders_visibility(show_riders: bool | None) -> bool:
 
 
 @callback(
+    Output("bar-dropdown", "disabled"),
+    Output("bar-dropdown", "placeholder"),
+    Output("bar-selection-hint", "children"),
+    Output("generate-riders-first-notice", "is_open"),
+    Input("riders-ready", "data"),
+)
+def update_bar_selection_availability(ready: bool):
+    if ready:
+        return False, "Digite para buscar um bar...", "Digite parte do nome, rua ou ID, ou clique em um bar no mapa.", False
+    return True, "Gere os entregadores para escolher um bar...", "Gere os entregadores na aba Entregadores para liberar a seleção de bares.", True
+
+
+@callback(
+    Output("btn-search-nearby-riders", "disabled"),
+    Output("btn-search-nearby-riders", "title"),
+    Output("map-selection-legend", "hidden"),
+    Output("map-overview-legend", "hidden"),
+    Input("riders-ready", "data"),
+    Input("bar-dropdown", "value"),
+)
+def update_nearby_search_availability(ready: bool, selected_bar_id: int | None):
+    bar = SYSTEM.get_bar(int(selected_bar_id)) if selected_bar_id is not None else None
+    selected = bool(ready and bar is not None and bar.latitude is not None and bar.longitude is not None)
+    if not ready:
+        hint = "Gere os entregadores primeiro."
+    elif not selected:
+        hint = "Selecione um bar no mapa ou na busca."
+    else:
+        hint = "Buscar entregadores no raio do bar selecionado."
+    return not selected, hint, not selected, selected
+
+
+@callback(
     Output("geojson-bares", "data"),
     Input("bairro-dropdown", "value"),
+    Input("bar-dropdown", "value"),
+    Input("riders-ready", "data"),
 )
-def update_map_bars_by_bairro(selected_bairro: str | None) -> dict:
+def update_map_bars_by_bairro(selected_bairro: str | None, selected_bar_id: int | None, riders_ready: bool) -> dict:
     """Atualiza os bares exibidos no mapa quando um bairro específico é filtrado."""
+    if riders_ready and selected_bar_id is not None and SYSTEM.get_bar(int(selected_bar_id)) is not None:
+        # O bar selecionado já aparece na camada de destaque.
+        return {"type": "FeatureCollection", "features": []}
     if not selected_bairro:
         return ALL_BARS_GEOJSON
     bars_in_bairro = BARS_BY_BAIRRO.get(selected_bairro, [])
     return build_bars_geojson(bars_in_bairro)
+
+
+@callback(
+    Output("bairro-dropdown", "value"),
+    Output("input-search-radius-km", "value"),
+    Output("bar-dropdown", "search_value"),
+    Input("btn-reset-view", "n_clicks"),
+    prevent_initial_call=True,
+)
+def reset_search_filters(_n_clicks: int | None):
+    """Limpa bairro e texto da busca e restaura o raio padrão; o bar é limpo no dropdown."""
+    return None, DEFAULT_SEARCH_RADIUS_KM, ""
 
 
 @callback(
@@ -365,6 +503,7 @@ def update_map_bars_by_bairro(selected_bairro: str | None) -> dict:
     Input("bairro-dropdown", "value"),
     Input("geojson-bares", "clickData"),
     Input("btn-reset-view", "n_clicks"),
+    Input("riders-ready", "data"),
     State("bar-dropdown", "value"),
 )
 def update_bar_dropdown(
@@ -372,10 +511,13 @@ def update_bar_dropdown(
     selected_bairro: str | None,
     geojson_click: dict | None,
     _reset_clicks: int | None,
+    riders_ready: bool,
     current_value: int | None,
 ):
     """Atualiza as opções do dropdown e seleciona o bar quando clicado no mapa."""
     triggered = ctx.triggered_id
+    if not riders_ready or get_rider_generation_state()["running"] or not SYSTEM.riders:
+        return INITIAL_DROPDOWN_OPTIONS, None
 
     # 1. clique no botão de reset
     if triggered == "btn-reset-view":
@@ -418,7 +560,7 @@ def update_bar_dropdown(
     Output("map-bh", "viewport"),
     Output("bar-details-container", "children"),
     Output("nearby-search-results-container", "children", allow_duplicate=True),
-    Output("geojson-entregadores", "data", allow_duplicate=True),
+    Output("geojson-entregadores", "url", allow_duplicate=True),
     Output("geojson-entregadores-descartados", "data", allow_duplicate=True),
     Input("bar-dropdown", "value"),
     Input("btn-search-nearby-riders", "n_clicks"),
@@ -426,6 +568,7 @@ def update_bar_dropdown(
     Input("radio-ranking-criterion", "value"),
     Input("btn-reset-view", "n_clicks"),
     Input("bairro-dropdown", "value"),
+    Input("riders-ready", "data"),
     prevent_initial_call=True,
 )
 def update_map_and_details(
@@ -435,6 +578,7 @@ def update_map_and_details(
     ranking_criterion: str | None,
     _reset_clicks: int | None,
     selected_bairro: str | None,
+    riders_ready: bool,
 ):
     """Atualiza o bar selecionado, o círculo de raio, a busca de entregadores e a câmera."""
     triggered = ctx.triggered_id
@@ -442,7 +586,7 @@ def update_map_and_details(
 
     # se uma geração de entregadores estiver em andamento, encerra qualquer análise de bar anterior
     gen_state = get_rider_generation_state()
-    if gen_state.get("running"):
+    if gen_state.get("running") or not riders_ready or not SYSTEM.riders:
         return (
             [],
             dash.no_update,
@@ -459,7 +603,7 @@ def update_map_and_details(
             {"center": BH_CENTER, "zoom": BH_DEFAULT_ZOOM, "transition": "flyTo"},
             render_bar_details(None),
             render_nearby_search_results(None),
-            build_riders_geojson(SYSTEM.riders.values()),
+            get_all_riders_map_url(),
             empty_discarded,
         )
 
@@ -474,7 +618,7 @@ def update_map_and_details(
                 {"center": [mean_lat, mean_lon], "zoom": 15, "transition": "flyTo"},
                 render_bar_details(None),
                 render_nearby_search_results(None),
-                build_riders_geojson(SYSTEM.riders.values()),
+                get_all_riders_map_url(),
                 empty_discarded,
             )
         return (
@@ -482,18 +626,22 @@ def update_map_and_details(
             {"center": BH_CENTER, "zoom": BH_DEFAULT_ZOOM, "transition": "flyTo"},
             render_bar_details(None),
             render_nearby_search_results(None),
-            build_riders_geojson(SYSTEM.riders.values()),
+            get_all_riders_map_url(),
             empty_discarded,
         )
 
     # 3. nenhum bar selecionado (ou desmarcado)
     if selected_bar_id is None:
+        # Só restaura os pontos quando a seleção ou o bairro são limpos.
+        map_url = dash.no_update
+        if triggered in ("bar-dropdown", "bairro-dropdown"):
+            map_url = get_all_riders_map_url()
         return (
             [],
             dash.no_update,
             render_bar_details(None),
             render_nearby_search_results(None),
-            build_riders_geojson(SYSTEM.riders.values()),
+            map_url,
             empty_discarded,
         )
 
@@ -504,7 +652,7 @@ def update_map_and_details(
             dash.no_update,
             render_bar_details(None),
             render_nearby_search_results(None),
-            build_riders_geojson(SYSTEM.riders.values()),
+            get_all_riders_map_url(),
             empty_discarded,
         )
 
@@ -515,7 +663,7 @@ def update_map_and_details(
             {"center": [bar.latitude, bar.longitude], "zoom": 16, "transition": "flyTo"},
             render_bar_details(bar),
             render_nearby_search_results(bar=bar, invalid_radius=True),
-            build_riders_geojson(SYSTEM.riders.values()),
+            get_all_riders_map_url(),
             empty_discarded,
         )
 
@@ -523,17 +671,6 @@ def update_map_and_details(
     radius_meters = radius_val * 1000.0
     zoom_level = get_zoom_for_radius(radius_val)
     viewport = {"center": [bar.latitude, bar.longitude], "zoom": zoom_level, "transition": "flyTo"}
-
-    # 5. caso ainda não existam entregadores gerados no sistema
-    if len(SYSTEM.riders) == 0:
-        return (
-            render_highlighted_bar_layer(bar, radius_meters=radius_meters),
-            viewport,
-            render_bar_details(bar),
-            render_nearby_search_results(bar=bar, total_system_riders=0),
-            dash.no_update,
-            empty_discarded,
-        )
 
     # 6. executa a busca na Trie (célula + adjacentes), filtra pelo raio e plota filtrados vs descartados clusterizados
     ranking_by = ranking_criterion if ranking_criterion in ("time", "distance") else "time"
@@ -548,13 +685,13 @@ def update_map_and_details(
             search_result=search_result,
             total_system_riders=len(SYSTEM.riders),
         ),
-        search_result["geojson_filtered"],
+        create_map_url(search_result["geojson_filtered"]),
         search_result["geojson_discarded"],
     )
 
 
 @callback(
-    Output("geojson-entregadores", "data"),
+    Output("geojson-entregadores", "url"),
     Output("geojson-entregadores-descartados", "data"),
     Output("nearby-search-results-container", "children", allow_duplicate=True),
     Output("riders-status-container", "children"),
@@ -569,6 +706,7 @@ def update_map_and_details(
     Output("bar-dropdown", "value", allow_duplicate=True),
     Output("layer-bar-selecionado", "children", allow_duplicate=True),
     Output("bar-details-container", "children", allow_duplicate=True),
+    Output("riders-ready", "data"),
     Input("btn-generate-riders", "n_clicks"),
     Input("interval-rider-progress", "n_intervals"),
     State("input-num-riders", "value"),
@@ -605,6 +743,7 @@ def handle_generate_riders(
                 dash.no_update,
                 dash.no_update,
                 dash.no_update,
+                dash.no_update,
             )
 
         start_rider_generation_job(
@@ -628,6 +767,7 @@ def handle_generate_riders(
             None,
             [],
             render_bar_details(None),
+            False,
         )
 
     # 2. atualização periódica da barra de progresso via dcc.Interval
@@ -651,29 +791,29 @@ def handle_generate_riders(
             dash.no_update,
             dash.no_update,
             dash.no_update,
+            False,
         )
 
     # 3. geração concluída: plota todos os novos entregadores no mapa sem prender o app em análise de bar
     return (
-        state["geojson"],
+        state["map_url"],
         {"type": "FeatureCollection", "features": []},
         render_nearby_search_results(None),
         render_riders_status(
             total_riders=state["total_riders"],
-            last_generated=state["generated_so_far"],
-            cleared=state["cleared"],
         ),
         {"display": "block"},
         100,
-        "100%",
+        "100% gerados",
         "success",
         False,
-        state["message"],
+        "Entregadores gerados. Carregando os pontos no mapa…",
         True,
         False,
-        None,
+        dash.no_update,
         [],
         render_bar_details(None),
+        bool(state["total_riders"]),
     )
 
 
@@ -721,4 +861,4 @@ def update_initialization_progress(_n_intervals: int | None):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=8050)
+    app.run(debug=False, host="127.0.0.1", port=8050)

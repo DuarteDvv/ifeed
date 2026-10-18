@@ -21,6 +21,7 @@ from src.geometry.geometry_utilities import (
 )
 from src.models.Bar import Bar
 from src.models.Rider import Rider
+from src.webpage.map_data import create_map_url
 from src.spatial_search.spatial_search import (
     osm_distance_and_time,
     search_candidates,
@@ -60,7 +61,7 @@ _GENERATION_STATE: dict[str, Any] = {
     "cleared": True,
     "message": "",
     "markers": [],
-    "geojson": {"type": "FeatureCollection", "features": []},
+    "map_url": None,
 }
 
 
@@ -379,7 +380,7 @@ def render_nearby_search_results(
     total_system_riders: int = 0,
     invalid_radius: bool = False,
 ):
-    """Renderiza o painel lateral com o resultado da busca de entregadores no raio de atendimento."""
+    """Renderiza o painel sobre o mapa com o resultado da busca de entregadores no raio de atendimento."""
     if invalid_radius:
         return html.Div([
             dbc.Alert(
@@ -423,35 +424,34 @@ def render_nearby_search_results(
     ranking_by = search_result.get("ranking_by", "time")
     is_ready = is_initialization_ready()
 
-    rider_items = []
-    for item in filtered_list[:50]:
-        if ranking_by == "time":
-            badge_label = format_estimated_time(item.get("estimated_time"), is_ready=is_ready)
-            badge_title = "Tempo de trajeto estimado pelas ruas"
-        else:
-            dist_m = item["distance"]
-            badge_label = f"{dist_m:.0f} m" if dist_m < 1000 else f"{dist_m / 1000.0:.2f} km ({dist_m:.0f} m)"
-            badge_title = "Distância em linha reta ao restaurante"
-
-        rider_items.append(
-            html.Div(
-                className="d-flex justify-content-between align-items-center py-1 border-bottom",
-                children=[
-                    html.Span(f"Entregador #{item['id']}", className="fw-semibold small"),
-                    dbc.Badge(
-                        badge_label,
-                        color="warning",
-                        text_color="dark",
-                        className="font-monospace",
-                        title=badge_title,
-                    ),
-                ],
-            )
-        )
+    rider_items = [
+        html.Tr([
+            html.Th(f"#{item['id']}", scope="row"),
+            html.Td(format_estimated_time(item.get("estimated_time"), is_ready=is_ready)),
+            html.Td(format_road_distance(item.get("road_distance"))
+                    if item.get("road_distance") is not None else "Sem rota"),
+            html.Td(format_road_distance(item.get("distance"))),
+        ])
+        for item in filtered_list[:50]
+    ]
+    rider_table = dbc.Table(
+        [
+            html.Caption("Até 50 entregadores. Distância = linha reta até o bar."),
+            html.Thead(html.Tr([
+                html.Th("Entregador", scope="col"),
+                html.Th("Tempo de trajeto", scope="col"),
+                html.Th("Distância de trajeto", scope="col", title="Distância pela malha viária"),
+                html.Th("Distância", scope="col", title="Distância em linha reta"),
+            ])),
+            html.Tbody(rider_items),
+        ],
+        size="sm", striped=True, hover=True,
+        className="riders-results-table mb-0 small",
+    )
 
     return dbc.Card(
         dbc.CardBody([
-            html.H6("Entregadores no Raio de Atendimento", className="fw-bold mb-2"),
+
             html.Div(
                 className="d-flex flex-wrap gap-1 mb-2",
                 children=[
@@ -471,43 +471,13 @@ def render_nearby_search_results(
                     ),
                 ],
             ),
-            html.Div(
-                className="small text-muted mb-2",
-                style={"fontSize": "0.78rem"},
-                children=[
-                    html.Div([
-                        html.Strong("Busca na Trie (Geohash): "),
-                        html.Code(prefix_used),
-                        html.Span(" + 8 células adjacentes"),
-                    ]),
-                    html.Div([
-                        html.Strong("Candidatos na região: "),
-                        html.Span(f"{trie_count} encontrados ({discarded_trie} fora do raio)"),
-                    ]),
-                ],
-            ),
-            html.Div(
-                className="small mb-2 p-2 bg-light rounded border",
-                style={"fontSize": "0.75rem"},
-                children=[
-                    html.Div([
-                        html.Strong("Em destaque (laranja): "),
-                        html.Span(f"dentro do raio (≤ {radius_km:g} km)"),
-                    ]),
-                    html.Div([
-                        html.Strong("Sem destaque (cinza): "),
-                        html.Span("entregadores descartados da região"),
-                    ]),
-                    html.Div([
-                        html.Strong("Exibição ao lado: "),
-                        html.Span(
-                            "tempo estimado pelas ruas"
-                            if ranking_by == "time"
-                            else "distância em linha reta"
-                        ),
-                    ]),
-                ],
-            ),
+            html.Details([
+                html.Summary("Detalhes da busca", className="text-muted"),
+                html.Div([
+                    "Busca na Trie: ", html.Code(prefix_used), " + 8 células adjacentes. ",
+                    f"{trie_count} candidatos ({discarded_trie} fora do raio).",
+                ], className="mt-1"),
+            ], className="small mb-2"),
             html.Div(
                 className="d-flex justify-content-between align-items-center mb-1 mt-2 pt-1 border-top",
                 children=[
@@ -531,9 +501,9 @@ def render_nearby_search_results(
             ),
             (
                 html.Div(
-                    style={"maxHeight": "160px", "overflowY": "auto"},
+                    style={"maxHeight": "200px", "overflow": "auto"},
                     className="border rounded px-2 py-1 bg-white",
-                    children=rider_items,
+                    children=rider_table,
                 )
                 if filtered_count > 0
                 else html.P(
@@ -618,7 +588,7 @@ def _run_generation_worker(
         # cede o GIL brevemente para que o servidor Flask/Dash responda ao dcc.Interval
         time.sleep(0.015)
 
-    # construção do GeoJSON clusterizado do mapa (80% -> 100%)
+    # construção dos pontos do mapa (80% -> 95%); a compressão vem em seguida
     all_riders = list(system.riders.values())
     total_in_system = len(all_riders)
     features: list[dict[str, Any]] = []
@@ -628,7 +598,7 @@ def _run_generation_worker(
         if rider.latitude is not None and rider.longitude is not None:
             features.append(build_rider_feature(rider))
         if idx % step == 0 or idx == total_in_system:
-            render_pct = 80 + int((idx / max(1, total_in_system)) * 20)
+            render_pct = 80 + int((idx / max(1, total_in_system)) * 15)
             with _PROGRESS_LOCK:
                 _GENERATION_STATE["percent"] = min(99, render_pct)
                 _GENERATION_STATE["message"] = (
@@ -636,10 +606,16 @@ def _run_generation_worker(
                 )
             time.sleep(0.01)
 
+    geojson = {"type": "FeatureCollection", "features": features}
+    with _PROGRESS_LOCK:
+        _GENERATION_STATE["percent"] = 97
+        _GENERATION_STATE["message"] = "Comprimindo os dados para carregar o mapa…"
+    map_url = create_map_url(geojson, full_map=True)
+
     with _PROGRESS_LOCK:
         _GENERATION_STATE["percent"] = 100
         _GENERATION_STATE["total_riders"] = total_in_system
-        _GENERATION_STATE["geojson"] = {"type": "FeatureCollection", "features": features}
+        _GENERATION_STATE["map_url"] = map_url
         _GENERATION_STATE["message"] = (
             f"Concluído! {generated_so_far:,} entregadores gerados.".replace(",", ".")
         )
@@ -665,7 +641,7 @@ def start_rider_generation_job(
             "cleared": bool(clear_existing),
             "message": f"Gerando entregadores: 0 / {int(num_riders):,}".replace(",", "."),
             "markers": [],
-            "geojson": {"type": "FeatureCollection", "features": []},
+            "map_url": None,
         })
 
     worker = threading.Thread(
@@ -678,8 +654,6 @@ def start_rider_generation_job(
 
 def render_riders_status(
     total_riders: int,
-    last_generated: int | None = None,
-    cleared: bool = False,
     invalid_input: bool = False,
 ) -> html.Div:
     """Renderiza o indicador de quantidade de entregadores ativos no mapa."""
@@ -697,14 +671,6 @@ def render_riders_status(
             html.Small(
                 "Informe uma quantidade válida maior que zero.",
                 className="text-danger d-block mt-1",
-            )
-        )
-    elif last_generated is not None:
-        acao = "substituídos" if cleared else "adicionados"
-        children.append(
-            html.Small(
-                f"+{last_generated:,} entregadores gerados ({acao}).".replace(",", "."),
-                className="text-success d-block mt-1",
             )
         )
 
@@ -770,7 +736,6 @@ def render_riders_controls(initial_total: int = 0, is_ready: bool | None = None)
                     id="input-num-riders",
                     type="number",
                     min=1,
-                    max=50000,
                     step=1,
                     value=DEFAULT_NUM_RIDERS,
                     placeholder="Nº de entregadores",
@@ -825,7 +790,7 @@ def render_riders_controls(initial_total: int = 0, is_ready: bool | None = None)
         ),
         dcc.Interval(
             id="interval-rider-progress",
-            interval=100,
+            interval=500,
             disabled=True,
         ),
         html.Div(

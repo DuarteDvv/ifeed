@@ -128,3 +128,195 @@
 .accordion-collapse.show {
     overflow: visible !important;
 }
+/* Painel de resultados sobre o mapa, fora da área de eventos do Leaflet. */
+.map-container {
+    position: relative;
+}
+
+.map-search-results {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    z-index: 1000;
+    width: min(460px, calc(100% - 76px));
+    max-height: calc(100vh - 90px);
+    overflow: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+    background: white;
+}
+
+.map-search-results:not(:has(.card, .alert)) {
+    display: none;
+}
+
+.map-search-results .card {
+    margin-top: 0 !important;
+}
+
+.riders-results-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    vertical-align: middle;
+}
+
+.riders-results-table td {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+    .map-search-results {
+        top: 60px;
+        right: 10px;
+        width: calc(100% - 65px);
+        max-height: 55vh;
+    }
+}
+
+.map-results-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    background: #fff8e8;
+    list-style: none;
+}
+
+.map-results-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.map-results-toggle:focus-visible {
+    outline: 2px solid #2c3e50;
+    outline-offset: -2px;
+}
+
+.map-search-results[open] .panel-expand-label,
+.map-search-results:not([open]) .panel-minimize-label {
+    display: none;
+}
+
+.map-search-results:not([open]) {
+    width: fit-content;
+}
+
+.map-search-results .card-body {
+    padding: 0.75rem;
+}
+
+.riders-results-table {
+    font-size: 0.72rem;
+}
+
+/* Detalhes do bar no canto inferior esquerdo, com recolhimento independente. */
+.map-bar-details {
+    top: auto;
+    right: auto;
+    bottom: 24px;
+    left: 16px;
+    width: min(340px, calc(100% - 32px));
+    max-height: 40vh;
+}
+
+.map-bar-details:not(:has(.border-danger)) {
+    display: none;
+}
+
+.map-bar-details .map-results-toggle {
+    background: #fff0ee;
+}
+
+@media (max-width: 767px) {
+    .map-bar-details {
+        top: auto;
+        right: auto;
+        bottom: 24px;
+        left: 10px;
+        width: min(340px, calc(100% - 20px));
+        max-height: 30vh;
+    }
+}
+
+/* Legenda independente das janelas de resultados. */
+.map-selection-legend {
+    position: absolute;
+    bottom: 24px;
+    right: 16px;
+    z-index: 1000;
+    max-width: calc(100% - 32px);
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+    font-size: 0.72rem;
+}
+
+.map-selection-legend > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.legend-symbol {
+    display: inline-block;
+    flex: 0 0 12px;
+    height: 12px;
+    border: 1px solid white;
+}
+
+.legend-bar {
+    background: #d9534f;
+    border-radius: 50%;
+}
+
+.legend-rider, .legend-discarded {
+    transform: rotate(45deg);
+    border-radius: 2px;
+}
+
+.legend-rider { background: #ff6b00; }
+.legend-discarded { background: #95a5a6; }
+.legend-radius {
+    border: 2px dashed #ff6b00;
+    border-radius: 50%;
+    background: rgba(255, 107, 0, 0.08);
+}
+
+.legend-bar-cluster-small,
+.legend-bar-cluster-medium,
+.legend-bar-cluster-large {
+    border-radius: 50%;
+}
+
+.legend-bar-cluster-small { background: rgba(193, 245, 108, 0.6); }
+.legend-bar-cluster-medium { background: rgba(236, 137, 120, 0.8); }
+.legend-bar-cluster-large { background: rgba(215, 71, 159, 0.8); }
+
+/* Em mapas estreitos, mantém a legenda acima da janela do bar. */
+@media (max-width: 1100px) {
+    .map-selection-legend {
+        bottom: calc(40vh + 36px);
+        left: 16px;
+        right: auto;
+    }
+}
+
+@media (max-width: 767px) {
+    .map-selection-legend {
+        bottom: calc(30vh + 36px);
+        left: 10px;
+    }
+}
+
+/* Na visão geral não há janela de bar; a legenda fica junto à base do mapa. */
+.map-overview-legend {
+    bottom: 24px;
+    right: 16px;
+    left: auto;
+}
