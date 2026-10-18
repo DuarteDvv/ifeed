@@ -2,6 +2,7 @@
 
 import osmnx as ox
 
+from src.generation.rider_generation import filter_candidates_by_radius
 from src.geo_index.geohash.geohashing import get_geohash_neighbors
 from src.geometry.geometry_utilities import (
     EARTH_RADIUS,
@@ -11,20 +12,31 @@ from src.geometry.geometry_utilities import (
 
 __all__ = [
     "EARTH_RADIUS",
+    "select_geohash_prefix_size",
     "search_candidates",
     "haversine_distance",
     "classify_candidates_by_distance",
+    "filter_candidates_by_radius",
     "osm_distance_and_time",
 ]
 
 
-def search_candidates(tree, bar_geohash):
-    """Retorna IDs únicos da célula do bar e das oito vizinhas, com prefixo 6"""
+def select_geohash_prefix_size(radius_meters: float) -> int:
+    """Seleciona o tamanho de prefixo Geohash cuja grade 3x3 cobre integralmente o raio em metros."""
+    if radius_meters <= 600.0:
+        return 6
+    if radius_meters <= 4500.0:
+        return 5
+    return 4
+
+
+def search_candidates(tree, bar_geohash, prefix_size: int = 6):
+    """Retorna IDs únicos da célula do bar e das oito vizinhas."""
     if not bar_geohash:
         return []
 
     candidate_ids = []
-    prefixes = [bar_geohash[:6]] + get_geohash_neighbors(bar_geohash)
+    prefixes = [bar_geohash[:prefix_size]] + get_geohash_neighbors(bar_geohash, size=prefix_size)
 
     for prefix in prefixes:
         candidate_ids.extend(tree.search_prefix(prefix))
@@ -33,7 +45,8 @@ def search_candidates(tree, bar_geohash):
 
 
 def osm_distance_and_time(road_network, candidates, restaurant_location):
-    """Calcula rotas em lote, com distância em metros e tempo em minutos."""
+    "calcula rotas em lote, com distância em metros e tempo em minutos"
+
     if not candidates:
         return []
 
@@ -41,7 +54,7 @@ def osm_distance_and_time(road_network, candidates, restaurant_location):
     longitudes = [bar_longitude] + [candidate["longitude"] for candidate in candidates]
     latitudes = [bar_latitude] + [candidate["latitude"] for candidate in candidates]
 
-    # O primeiro nó é o bar; os demais são os entregadores, na ordem de entrada.
+    # o primeiro nó é o bar. os demais são os entregadores, na ordem de entrada
     nodes = ox.distance.nearest_nodes(road_network, X=longitudes, Y=latitudes)
     bar_node = nodes[0]
     rider_nodes = list(nodes[1:])

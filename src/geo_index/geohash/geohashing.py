@@ -66,15 +66,15 @@ def geohash_decode(geohash: str) -> tuple[float, float]:
     longitude = (longitude_bounds[0] + longitude_bounds[1]) / 2
     return latitude, longitude
 
-def get_geohash_neighbors(key):
+def get_geohash_neighbors(key, size: int = 6):
     """Retorna o centro do geohash dos 8 vizinhos do geohash fornecido. 
     - Poderia ter o caso de estarmos no limite das coordenadas, então alguns vizinhos poderiam não existir mas por 
     pelo fato de ser apenas belo horizonte isso não é um problema
     """
 
-    prefix_6 = key[:6]
+    prefix = key[:size]
 
-    ((lat_min, lat_max), (lon_min, lon_max)) = geohash_decode_bounds(prefix_6)
+    ((lat_min, lat_max), (lon_min, lon_max)) = geohash_decode_bounds(prefix)
     altura_box = lat_max - lat_min
     largura_box = lon_max - lon_min
 
@@ -94,5 +94,5 @@ def get_geohash_neighbors(key):
         (lat_centro - altura_box, lon_centro + largura_box) # sul leste
     ]
 
-    return [geohash_encode(lat, lon, size=6) for lat, lon in vizinhos] 
+    return [geohash_encode(lat, lon, size=size) for lat, lon in vizinhos] 
 

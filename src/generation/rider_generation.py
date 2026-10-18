@@ -22,11 +22,25 @@ _CACHED_STREET_GEOMETRIES: dict[str, dict[str, tuple[tuple[float, float], ...]]]
 
 
 def filter_valid_bars(bars: Iterable[Bar]) -> list[Bar]:
-    """filtra e retorna apenas bares que possuem latitude e longitude definidas"""
+    "filtra e retorna apenas bares que possuem latitude e longitude definidas"
     return [
         bar for bar in bars
         if bar.latitude is not None and bar.longitude is not None
     ]
+
+
+def filter_candidates_by_radius(candidates: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    "retorna apenas os dicionários de candidatos que estejam dentro do raio de atendimento"
+
+    filtered: list[dict[str, Any]] = []
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+
+        if cand.get("within_range", True):
+            filtered.append(cand)
+
+    return filtered
 
 
 def calculate_bar_quotas(

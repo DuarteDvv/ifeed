@@ -48,14 +48,65 @@ window.ifeed = Object.assign({}, window.ifeed, {
         return marker;
     },
 
-    // Renderiza entregadores individuais (quando desagrupados no zoom) como círculos laranjas
-    riderPointToLayer: function (feature, latlng) {
-        return L.circleMarker(latlng, {
-            radius: 6,
-            color: "#ffffff",
-            fillColor: "#ff6b00",
-            fillOpacity: 0.9,
-            weight: 1.5
+    // Renderiza cada cluster de entregadores descartados como um ícone em formato de losango cinza
+    riderDiscardedClusterToLayer: function (feature, latlng) {
+        var count = feature.properties.point_count;
+        var countLabel = feature.properties.point_count_abbreviated;
+
+        var sizeClass = "rider-cluster-small";
+        if (count >= 500) {
+            sizeClass = "rider-cluster-large";
+        } else if (count >= 50) {
+            sizeClass = "rider-cluster-medium";
+        }
+
+        var icon = L.divIcon({
+            html: '<div class="rider-cluster-diamond"><span>' + countLabel + '</span></div>',
+            className: "rider-cluster rider-cluster-discarded " + sizeClass,
+            iconSize: L.point(44, 44)
         });
+
+        var marker = L.marker(latlng, { icon: icon });
+        var label = count === 1 ? "1 entregador descartado nesta região" : count.toLocaleString("pt-BR") + " entregadores descartados nesta região";
+        marker.bindTooltip(label, { direction: "right", offset: [22, 0] });
+        return marker;
+    },
+
+    // Renderiza entregadores individuais: em destaque (laranja) quando filtrados e em cinza quando descartados
+    riderPointToLayer: function (feature, latlng) {
+        var props = (feature && feature.properties) ? feature.properties : {};
+        var marker;
+        if (props.status === "discarded") {
+            marker = L.circleMarker(latlng, {
+                radius: 5,
+                color: "#d5d8dc",
+                fillColor: "#808b96",
+                fillOpacity: 0.55,
+                weight: 1.0
+            });
+        } else if (props.status === "filtered") {
+            marker = L.circleMarker(latlng, {
+                radius: 7,
+                color: "#ffffff",
+                fillColor: "#ff6b00",
+                fillOpacity: 0.95,
+                weight: 2.0
+            });
+        } else {
+            marker = L.circleMarker(latlng, {
+                radius: 6,
+                color: "#ffffff",
+                fillColor: "#ff6b00",
+                fillOpacity: 0.9,
+                weight: 1.5
+            });
+        }
+        if (props.tooltip) {
+            marker.bindTooltip(props.tooltip);
+        }
+        if (props.popup) {
+            marker.bindPopup(props.popup);
+        }
+        return marker;
     }
 });

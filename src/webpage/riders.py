@@ -9,21 +9,35 @@ import dash_leaflet as dl
 
 from src.delivery_system.DeliverySystem import DeliverySystem
 from src.generation.rider_generation import (
+    filter_candidates_by_radius,
     get_segments_kdtree,
     get_street_geometries,
     load_segmentation_points,
 )
+from src.geo_index.geohash.geohashing import geohash_encode
+from src.geometry.geometry_utilities import (
+    classify_candidates_by_distance,
+    haversine_distance,
+)
+from src.models.Bar import Bar
 from src.models.Rider import Rider
+from src.spatial_search.spatial_search import (
+    osm_distance_and_time,
+    search_candidates,
+    select_geohash_prefix_size,
+)
 import osmnx as ox
 
 DEFAULT_NUM_RIDERS = 200
 DEFAULT_STD_DEV_METERS = 500.0
+DEFAULT_SEARCH_RADIUS_KM = 2.0
 RIDER_FILL_COLOR = "#ff6b00"
 RIDER_BORDER_COLOR = "#ffffff"
 MAX_GENERATION_BATCHES = 20
 
 # Referências às funções JavaScript em assets/riders_map.js para o dl.GeoJSON
 RIDER_CLUSTER_TO_LAYER = {"variable": "ifeed.riderClusterToLayer"}
+RIDER_DISCARDED_CLUSTER_TO_LAYER = {"variable": "ifeed.riderDiscardedClusterToLayer"}
 RIDER_POINT_TO_LAYER = {"variable": "ifeed.riderPointToLayer"}
 
 # estado global thread-safe para o carregamento inicial da malha viária e kd-tree
@@ -167,8 +181,81 @@ def generate_and_store_riders(
     )
 
 
-def build_rider_feature(rider: Rider) -> dict[str, Any]:
-    """Converte um Rider em uma Feature GeoJSON com tooltip e popup."""
+def format_estimated_time(minutes: float | None, is_ready: bool = True) -> str:
+    """Formata o tempo estimado em minutos para exibição amigável."""
+    if minutes is None:
+        return "Calculando..." if not is_ready else "Sem rota"
+    if minutes < 1.0:
+        secs = round(minutes * 60)
+        return f"{secs} s" if secs > 0 else "< 1 s"
+    mins = int(minutes)
+    secs = round((minutes - mins) * 60)
+    if secs > 0:
+        return f"{mins} min {secs} s"
+    return f"{mins} min"
+
+
+def format_road_distance(meters: float | None) -> str:
+    """Formata a distância viária em metros para exibição amigável."""
+    if meters is None:
+        return "N/A"
+    if meters < 1000:
+        return f"{meters:.0f} m"
+    return f"{meters / 1000.0:.2f} km"
+
+
+def build_rider_feature(
+    rider: Rider,
+    status: str = "normal",
+    distance_meters: float | None = None,
+    road_distance_meters: float | None = None,
+    estimated_time_minutes: float | None = None,
+    ranking_by: str = "time",
+) -> dict[str, Any]:
+    """Converte um Rider em uma Feature GeoJSON com status de destaque, tooltip e popup."""
+    if status == "filtered" and distance_meters is not None:
+        dist_str = f"{distance_meters:.0f} m ({distance_meters / 1000.0:.2f} km)"
+        time_str = format_estimated_time(estimated_time_minutes) if estimated_time_minutes is not None else None
+        road_dist_str = format_road_distance(road_distance_meters) if road_distance_meters is not None else None
+
+        if ranking_by == "time" and time_str is not None:
+            tooltip = f"🛵 Entregador #{rider.id} — ⏱️ {time_str}"
+        else:
+            tooltip = f"🛵 Entregador #{rider.id} — {dist_str}"
+
+        popup_parts = [
+            f"<b>🛵 Entregador #{rider.id}</b> <span style='color:#ff6b00;font-weight:bold;'>(Dentro do raio)</span><br>"
+        ]
+        if time_str:
+            popup_parts.append(f"<b>Tempo de trajeto (ruas):</b> {time_str}<br>")
+        if road_dist_str:
+            popup_parts.append(f"<b>Distância pelas ruas:</b> {road_dist_str}<br>")
+        popup_parts.append(f"<b>Distância em linha reta:</b> {dist_str}<br>")
+        popup_parts.append(f"<b>Coordenadas:</b> ({rider.latitude:.6f}, {rider.longitude:.6f})<br>")
+        popup_parts.append(f"<b>Geohash:</b> {rider.geohash or 'N/A'}")
+        popup = "".join(popup_parts)
+    elif status == "discarded":
+        dist_info = (
+            f"{distance_meters:.0f} m ({distance_meters / 1000.0:.2f} km)"
+            if distance_meters is not None
+            else "Fora da região"
+        )
+        tooltip = f"🛵 Entregador #{rider.id} (Descartado — {dist_info})"
+        popup = (
+            f"<b>🛵 Entregador #{rider.id}</b> "
+            f"<span style='color:#808b96;font-weight:bold;'>(Descartado)</span><br>"
+            f"<b>Distância ao restaurante:</b> {dist_info}<br>"
+            f"<b>Coordenadas:</b> ({rider.latitude:.6f}, {rider.longitude:.6f})<br>"
+            f"<b>Geohash:</b> {rider.geohash or 'N/A'}"
+        )
+    else:
+        tooltip = f"🛵 Entregador #{rider.id}"
+        popup = (
+            f"<b>🛵 Entregador #{rider.id}</b><br>"
+            f"<b>Coordenadas:</b> ({rider.latitude:.6f}, {rider.longitude:.6f})<br>"
+            f"<b>Geohash:</b> {rider.geohash or 'N/A'}"
+        )
+
     return {
         "type": "Feature",
         "geometry": {
@@ -178,12 +265,13 @@ def build_rider_feature(rider: Rider) -> dict[str, Any]:
         "properties": {
             "id": rider.id,
             "geohash": rider.geohash,
-            "tooltip": f"🛵 Entregador #{rider.id}",
-            "popup": (
-                f"<b>🛵 Entregador #{rider.id}</b><br>"
-                f"<b>Coordenadas:</b> ({rider.latitude:.6f}, {rider.longitude:.6f})<br>"
-                f"<b>Geohash:</b> {rider.geohash or 'N/A'}"
-            ),
+            "status": status,
+            "distance": distance_meters,
+            "road_distance": road_distance_meters,
+            "estimated_time": estimated_time_minutes,
+            "ranking_by": ranking_by,
+            "tooltip": tooltip,
+            "popup": popup,
         },
     }
 
@@ -191,11 +279,271 @@ def build_rider_feature(rider: Rider) -> dict[str, Any]:
 def build_riders_geojson(riders: Iterable[Rider]) -> dict[str, Any]:
     """Converte uma coleção de entregadores em um FeatureCollection GeoJSON para clusterização."""
     features = [
-        build_rider_feature(rider)
+        build_rider_feature(rider, status="normal")
         for rider in riders
         if rider.latitude is not None and rider.longitude is not None
     ]
     return {"type": "FeatureCollection", "features": features}
+
+
+def search_and_build_riders_for_bar(
+    system: DeliverySystem,
+    bar: Bar,
+    radius_km: float,
+    ranking_by: str = "time",
+) -> dict[str, Any]:
+    """Busca entregadores na Trie (célula do bar + 8 adjacentes), filtra pelo raio,
+    calcula rotas na malha viária e monta o GeoJSON ordenado por tempo de trajeto ou distância.
+    """
+    radius_meters = float(radius_km) * 1000.0
+    bar_geohash = bar.geohash or geohash_encode(bar.latitude, bar.longitude, size=8)
+    prefix_size = select_geohash_prefix_size(radius_meters)
+
+    # 1. Busca na RadixTree pela célula do bar e as 8 células adjacentes em O(m + k)
+    candidate_ids = search_candidates(system.radix_tree, bar_geohash, prefix_size=prefix_size)
+    candidates = [
+        system.get_rider(cid)
+        for cid in candidate_ids
+        if system.get_rider(cid) is not None
+    ]
+
+    # 2. Classificação por distância geométrica (Haversine) e filtragem por raio
+    restaurant_location = (bar.latitude, bar.longitude)
+    classified = classify_candidates_by_distance(candidates, restaurant_location, radius_meters)
+    filtered = filter_candidates_by_radius(classified)
+
+    # 3. Se houver malha viária carregada, calcula distância pelas ruas e tempo de trajeto
+    road_network = getattr(system, "road_network", None)
+    if road_network is not None and filtered:
+        try:
+            filtered = osm_distance_and_time(road_network, filtered, restaurant_location)
+        except Exception as err:
+            print(f"Aviso no cálculo de rotas OSM: {err}")
+
+    # 4. Ordenação conforme critério escolhido: tempo de trajeto (default) ou distância
+    if ranking_by == "time":
+        filtered.sort(
+            key=lambda c: (
+                c.get("estimated_time") is None,
+                c.get("estimated_time") if c.get("estimated_time") is not None else float("inf"),
+                c.get("distance", float("inf")),
+            )
+        )
+    else:
+        filtered.sort(key=lambda c: c.get("distance", float("inf")))
+
+    filtered_by_id = {c["id"]: c for c in filtered}
+    classified_by_id = {c["id"]: c for c in classified}
+
+    # 5. Construção das Features GeoJSON: descartados ao fundo (cinza) e filtrados por cima (laranja)
+    discarded_features: list[dict[str, Any]] = []
+    filtered_features: list[dict[str, Any]] = []
+
+    for rider in system.riders.values():
+        if rider.latitude is None or rider.longitude is None:
+            continue
+
+        if rider.id in filtered_by_id:
+            info = filtered_by_id[rider.id]
+            filtered_features.append(
+                build_rider_feature(
+                    rider,
+                    status="filtered",
+                    distance_meters=info.get("distance"),
+                    road_distance_meters=info.get("road_distance"),
+                    estimated_time_minutes=info.get("estimated_time"),
+                    ranking_by=ranking_by,
+                )
+            )
+        else:
+            if rider.id in classified_by_id:
+                dist_m = classified_by_id[rider.id]["distance"]
+            else:
+                dist_m = round(
+                    haversine_distance(bar.latitude, bar.longitude, rider.latitude, rider.longitude),
+                    2,
+                )
+            discarded_features.append(
+                build_rider_feature(rider, status="discarded", distance_meters=dist_m)
+            )
+
+    geojson_filtered = {
+        "type": "FeatureCollection",
+        "features": filtered_features,
+    }
+    geojson_discarded = {
+        "type": "FeatureCollection",
+        "features": discarded_features,
+    }
+    geojson = {
+        "type": "FeatureCollection",
+        "features": discarded_features + filtered_features,
+    }
+
+    return {
+        "geojson": geojson,
+        "geojson_filtered": geojson_filtered,
+        "geojson_discarded": geojson_discarded,
+        "filtered": filtered,
+        "trie_candidates_count": len(classified),
+        "filtered_count": len(filtered_features),
+        "discarded_trie_count": len(classified) - len(filtered),
+        "discarded_total_count": len(discarded_features),
+        "prefix_used": bar_geohash[:prefix_size],
+        "prefix_size": prefix_size,
+        "radius_km": float(radius_km),
+        "radius_meters": radius_meters,
+        "ranking_by": ranking_by,
+    }
+
+
+def render_nearby_search_results(
+    bar: Bar | None = None,
+    search_result: dict[str, Any] | None = None,
+    total_system_riders: int = 0,
+    invalid_radius: bool = False,
+):
+    """Renderiza o painel lateral com o resultado da busca de entregadores no raio de atendimento."""
+    if invalid_radius:
+        return dbc.Alert(
+            "Informe um raio de atendimento válido (maior que 0 km).",
+            color="danger",
+            className="small py-2 px-3 mb-0 mt-2",
+        )
+
+    if bar is None:
+        return html.Div()
+
+    if total_system_riders <= 0:
+        return dbc.Alert(
+            [
+                html.Strong("Nenhum entregador no mapa. "),
+                "Abra a aba ",
+                html.B("Entregadores"),
+                " abaixo e clique em ",
+                html.B("Gerar Entregadores"),
+                " para visualizar os entregadores no raio deste restaurante.",
+            ],
+            color="warning",
+            className="small py-2 px-3 mb-0 mt-2",
+        )
+
+    if search_result is None:
+        return html.Div()
+
+    filtered_list = search_result["filtered"]
+    filtered_count = search_result["filtered_count"]
+    discarded_total = search_result["discarded_total_count"]
+    trie_count = search_result["trie_candidates_count"]
+    discarded_trie = search_result["discarded_trie_count"]
+    prefix_used = search_result["prefix_used"]
+    radius_km = search_result["radius_km"]
+    ranking_by = search_result.get("ranking_by", "time")
+    is_ready = is_initialization_ready()
+
+    rider_items = []
+    for item in filtered_list[:50]:
+        if ranking_by == "time":
+            badge_label = format_estimated_time(item.get("estimated_time"), is_ready=is_ready)
+            badge_title = "Tempo de trajeto estimado pelas ruas"
+        else:
+            dist_m = item["distance"]
+            badge_label = f"{dist_m:.0f} m" if dist_m < 1000 else f"{dist_m / 1000.0:.2f} km ({dist_m:.0f} m)"
+            badge_title = "Distância em linha reta ao restaurante"
+
+        rider_items.append(
+            html.Div(
+                className="d-flex justify-content-between align-items-center py-1 border-bottom",
+                children=[
+                    html.Span(f"🛵 Entregador #{item['id']}", className="fw-semibold small"),
+                    dbc.Badge(
+                        badge_label,
+                        color="warning",
+                        text_color="dark",
+                        className="font-monospace",
+                        title=badge_title,
+                    ),
+                ],
+            )
+        )
+
+    return dbc.Card(
+        dbc.CardBody([
+            html.H6("Entregadores no Raio de Atendimento", className="fw-bold mb-2"),
+            html.Div(
+                className="d-flex flex-wrap gap-1 mb-2",
+                children=[
+                    dbc.Badge(
+                        f"{filtered_count} no raio ({radius_km:g} km)",
+                        color="warning",
+                        text_color="dark",
+                    ),
+                    dbc.Badge(
+                        f"{discarded_total} descartados (cinza)",
+                        color="secondary",
+                    ),
+                    dbc.Badge(
+                        "⏱️ Por tempo de trajeto" if ranking_by == "time" else "📏 Por distância",
+                        color="info",
+                        text_color="dark",
+                    ),
+                ],
+            ),
+            html.Div(
+                className="small text-muted mb-2",
+                style={"fontSize": "0.78rem"},
+                children=[
+                    html.Div([
+                        html.Strong("Busca na Trie (Geohash): "),
+                        html.Code(prefix_used),
+                        html.Span(" + 8 células adjacentes"),
+                    ]),
+                    html.Div([
+                        html.Strong("Candidatos na região: "),
+                        html.Span(f"{trie_count} encontrados ({discarded_trie} fora do raio)"),
+                    ]),
+                ],
+            ),
+            html.Div(
+                className="small mb-2 p-2 bg-light rounded border",
+                style={"fontSize": "0.75rem"},
+                children=[
+                    html.Div([
+                        html.Span("🟠 ", style={"color": "#ff6b00"}),
+                        html.Strong("Em destaque (laranja): "),
+                        html.Span(f"dentro do raio (≤ {radius_km:g} km)"),
+                    ]),
+                    html.Div([
+                        html.Span("⚪ "),
+                        html.Strong("Sem destaque (cinza): "),
+                        html.Span("entregadores descartados"),
+                    ]),
+                    html.Div([
+                        html.Span("⏱️ " if ranking_by == "time" else "📏 "),
+                        html.Strong("Exibição ao lado: "),
+                        html.Span(
+                            "tempo estimado pelas ruas"
+                            if ranking_by == "time"
+                            else "distância em linha reta"
+                        ),
+                    ]),
+                ],
+            ),
+            (
+                html.Div(
+                    style={"maxHeight": "160px", "overflowY": "auto"},
+                    className="border rounded px-2 py-1 bg-white",
+                    children=rider_items,
+                )
+                if filtered_count > 0
+                else html.P(
+                    f"Nenhum entregador encontrado a até {radius_km:g} km deste restaurante.",
+                    className="small text-muted mb-0 fst-italic",
+                )
+            ),
+        ]),
+        className="border-warning shadow-sm mt-2",
+    )
 
 
 def render_rider_marker(rider: Rider) -> dl.CircleMarker:
@@ -335,7 +683,7 @@ def render_riders_status(
     invalid_input: bool = False,
 ) -> html.Div:
     """Renderiza o indicador de quantidade de entregadores ativos no mapa."""
-    children = [
+    children: list[Any] = [
         dbc.Badge(
             f"{total_riders:,} entregadores no mapa".replace(",", "."),
             color="warning" if total_riders > 0 else "secondary",

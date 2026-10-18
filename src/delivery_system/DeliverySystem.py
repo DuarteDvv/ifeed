@@ -2,12 +2,19 @@ import csv
 import gzip
 from osmnx import load_graphml
 
-from src.generation.rider_generation import generate_riders_data
+from src.generation.rider_generation import (
+    filter_candidates_by_radius,
+    generate_riders_data,
+)
 from src.geo_index.radix_tree.RadixTree import RadixTree
 from src.models.Rider import Rider
 from src.models.Bar import Bar
 from src.geo_index.geohash.geohashing import geohash_encode
-from src.spatial_search.spatial_search import classify_candidates_by_distance, osm_distance_and_time, search_candidates
+from src.spatial_search.spatial_search import (
+    classify_candidates_by_distance,
+    osm_distance_and_time,
+    search_candidates,
+)
 
 
 class DeliverySystem:
@@ -58,15 +65,29 @@ class DeliverySystem:
 
         return generated_riders
 
-    def search_nearby(self, bar_id, radius=1000):
-        """Busca entregadores próximos ao bar, com raio informado em metros.
+    def search_nearby(
+        self,
+        bar_id: int,
+        radius: float | None = None,
+        radius_km: float | None = None,
+        only_within_range: bool = False,
+    ):
+        """Busca entregadores próximos ao bar, com raio informado em metros ou km
 
-        Retorna None se o bar não existir ou não tiver coordenadas.
-        Retorna uma lista, possivelmente vazia, para consultas válidas.
+        Retorna None se o bar não existir ou não tiver coordenadas
+        Retorna uma lista, possivelmente vazia, para consultas válidas
+        Se only_within_range=True, filtra apenas os entregadores contidos no raio de atendimento
         """
         bar = self.get_bar(bar_id)
         if bar is None or bar.latitude is None or bar.longitude is None:
             return None
+
+        if radius_km is not None:
+            radius_meters = float(radius_km) * 1000.0
+        elif radius is not None:
+            radius_meters = float(radius)
+        else:
+            radius_meters = 1000.0
 
         restaurant_location = (bar.latitude, bar.longitude)
         bar_geohash = bar.geohash
@@ -75,9 +96,13 @@ class DeliverySystem:
         candidates = []
         for candidate_id in candidate_ids:
             rider = self.get_rider(candidate_id)
-            candidates.append(rider)
+            if rider is not None:
+                candidates.append(rider)
 
-        classified = classify_candidates_by_distance(candidates, restaurant_location, radius)
+        classified = classify_candidates_by_distance(candidates, restaurant_location, radius_meters)
+        if only_within_range:
+            classified = filter_candidates_by_radius(classified)
+
         results = osm_distance_and_time(self.road_network, classified, restaurant_location)
         
         return results

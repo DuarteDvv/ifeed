@@ -13,6 +13,7 @@ from src.generation.kd_tree.KD_Tree import KDTree
 from src.generation.rider_generation import (
     build_rider,
     calculate_bar_quotas,
+    filter_candidates_by_radius,
     filter_valid_bars,
     generate_riders_data,
     get_segments_kdtree,
@@ -140,5 +141,18 @@ for r in riders:
     assert min_dist_sq < 1e-18, f"Entregador {r.id} não está sobre uma rua (min_dist_sq={min_dist_sq})"
 
 print("OK: todos os entregadores gerados estão projetados sobre ruas reais de BH")
+ 
+print("\nTeste 7 - filter_candidates_by_radius")
+candidatos_classificados = [
+    {"id": 1, "latitude": -19.921, "longitude": -43.94, "distance": 111.19, "within_range": True},
+    {"id": 2, "latitude": -19.923, "longitude": -43.94, "distance": 333.58, "within_range": False},
+    {"id": 3, "latitude": -19.950, "longitude": -43.94, "distance": 3330.00, "within_range": False},
+]
+
+dentro_padrao = filter_candidates_by_radius(candidatos_classificados)
+print("Filtro within_range (IDs esperados: [1]):", [c["id"] for c in dentro_padrao])
+assert [c["id"] for c in dentro_padrao] == [1], "Erro no filtro within_range"
+print("OK: filter_candidates_by_radius filtra dicionários perfeitamente!")
+
 print("\nTodos os testes unitários de rider_generation passaram com sucesso!")
 

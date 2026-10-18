@@ -199,15 +199,48 @@ def render_bar_details(bar: Bar | None) -> dbc.Card:
     )
 
 
-def render_highlighted_bar_layer(bar: Bar | None) -> list:
-    """Cria a camada de destaque no mapa para o bar selecionado."""
+def get_zoom_for_radius(radius_km: float | None) -> int:
+    """Retorna um nível de zoom adequado para enquadrar o raio de atendimento no mapa."""
+    if radius_km is None or radius_km <= 0:
+        return 16
+    if radius_km <= 0.4:
+        return 16
+    if radius_km <= 1.0:
+        return 15
+    if radius_km <= 2.5:
+        return 14
+    if radius_km <= 5.0:
+        return 13
+    return 12
+
+
+def render_highlighted_bar_layer(
+    bar: Bar | None,
+    radius_meters: float | None = None,
+) -> list:
+    """Cria a camada de destaque no mapa para o bar selecionado e seu raio de atendimento."""
     if bar is None or bar.latitude is None or bar.longitude is None:
         return []
 
     nome_exibicao = get_bar_display_name(bar)
     position = [bar.latitude, bar.longitude]
+    layers = []
 
-    return [
+    if radius_meters is not None and radius_meters > 0:
+        layers.append(
+            dl.Circle(
+                center=position,
+                radius=float(radius_meters),
+                color="#ff6b00",
+                weight=2,
+                fillColor="#ff6b00",
+                fillOpacity=0.08,
+                dashArray="6, 6",
+                interactive=False,
+            )
+        )
+
+    layers.extend([
         # Halo pulsante de destaque ao redor do bar selecionado
         dl.CircleMarker(
             center=position,
@@ -241,7 +274,8 @@ def render_highlighted_bar_layer(bar: Bar | None) -> list:
                 ]),
             ],
         ),
-    ]
+    ])
+    return layers
 
 
 def filter_bar_options(

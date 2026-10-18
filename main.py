@@ -24,20 +24,25 @@ from src.webpage.map_navigation import (
     filter_bar_options,
     find_bar_from_click,
     format_bar_option,
+    get_zoom_for_radius,
     init_bar_catalog,
     render_bar_details,
     render_highlighted_bar_layer,
 )
 from src.webpage.riders import (
+    DEFAULT_SEARCH_RADIUS_KM,
     RIDER_CLUSTER_TO_LAYER,
+    RIDER_DISCARDED_CLUSTER_TO_LAYER,
     RIDER_POINT_TO_LAYER,
     build_riders_geojson,
     get_initialization_state,
     get_rider_generation_state,
     is_initialization_ready,
     render_initialization_progress,
+    render_nearby_search_results,
     render_riders_controls,
     render_riders_status,
+    search_and_build_riders_for_bar,
     start_initialization_job,
     start_rider_generation_job,
 )
@@ -82,9 +87,9 @@ app.layout = dbc.Container(
                     style={"height": "100vh", "overflowY": "auto", "padding": "20px"},
                     children=[
                         html.Div([
-                            html.H4("iFeed BH", className="fw-bold text-primary mb-1"),
+                            html.H4("iFeed", className="fw-bold text-primary mb-1"),
                             html.P(
-                                "Mapa interativo e busca de bares de Belo Horizonte",
+                                "Eduardo Birchal e Luís [Sobrenome]",
                                 className="text-muted small mb-2",
                             ),
                             dbc.Badge(
@@ -112,7 +117,7 @@ app.layout = dbc.Container(
                             [
                                 dbc.AccordionItem(
                                     item_id="section-bares",
-                                    title="🍽️ Buscar e Visualizar Bares",
+                                    title="Buscar e Visualizar Bares",
                                     children=[
                                         # 1. Filtro opcional por bairro
                                         html.Label("Filtrar por Bairro:", className="fw-semibold small mb-1"),
@@ -144,16 +149,60 @@ app.layout = dbc.Container(
                                             style={"fontSize": "0.75rem"},
                                         ),
 
-                                        # Botão para voltar à visão geral de BH
+                                        # 3. Parâmetro de raio de atendimento e busca de entregadores
+                                        html.Label(
+                                            "Raio de Atendimento (km):",
+                                            className="fw-semibold small mb-1",
+                                        ),
+                                        dbc.InputGroup(
+                                            [
+                                                dbc.InputGroupText("Raio"),
+                                                dbc.Input(
+                                                    id="input-search-radius-km",
+                                                    type="number",
+                                                    min=0.1,
+                                                    max=50.0,
+                                                    step=0.1,
+                                                    value=DEFAULT_SEARCH_RADIUS_KM,
+                                                    placeholder="Ex: 2.0",
+                                                ),
+                                                dbc.InputGroupText("km"),
+                                            ],
+                                            size="sm",
+                                            className="mb-2",
+                                        ),
+                                        html.Label(
+                                            "Ranquear entregadores por:",
+                                            className="fw-semibold small mb-1",
+                                        ),
+                                        dbc.RadioItems(
+                                            id="radio-ranking-criterion",
+                                            options=[
+                                                {"label": "Tempo de trajeto", "value": "time"},
+                                                {"label": "Distância", "value": "distance"},
+                                            ],
+                                            value="time",
+                                            inline=True,
+                                            className="small mb-2",
+                                        ),
                                         dbc.Button(
-                                            "Visão Geral de BH",
+                                            "Buscar Entregadores no Raio",
+                                            id="btn-search-nearby-riders",
+                                            color="warning",
+                                            size="sm",
+                                            className="w-100 fw-semibold mb-2",
+                                        ),
+
+                                        # Botão para voltar à visão geral de BH e limpar filtro
+                                        dbc.Button(
+                                            "Visão Geral de BH / Limpar Filtro",
                                             id="btn-reset-view",
                                             color="outline-primary",
                                             size="sm",
                                             className="w-100 mb-3",
                                         ),
 
-                                        # 3. Detalhes do bar selecionado
+                                        # 4. Detalhes do bar selecionado
                                         html.Label(
                                             "Bar Selecionado:",
                                             className="fw-semibold small mb-1",
@@ -162,11 +211,17 @@ app.layout = dbc.Container(
                                             id="bar-details-container",
                                             children=render_bar_details(None),
                                         ),
+
+                                        # 5. Resultados da busca de entregadores no raio
+                                        html.Div(
+                                            id="nearby-search-results-container",
+                                            children=render_nearby_search_results(None),
+                                        ),
                                     ],
                                 ),
                                 dbc.AccordionItem(
                                     item_id="section-entregadores",
-                                    title="🛵 Entregadores",
+                                    title="Entregadores",
                                     children=[
                                         render_riders_controls(len(SYSTEM.riders)),
                                     ],
@@ -190,13 +245,13 @@ app.layout = dbc.Container(
                                 ),
                                 dbc.Switch(
                                     id="switch-toggle-bares",
-                                    label="🍽️ Mostrar restaurantes",
+                                    label="Mostrar restaurantes",
                                     value=True,
                                     className="small mb-2 fw-semibold",
                                 ),
                                 dbc.Switch(
                                     id="switch-toggle-entregadores",
-                                    label="🛵 Mostrar entregadores",
+                                    label="Mostrar entregadores",
                                     value=True,
                                     className="small fw-semibold",
                                 ),
@@ -242,17 +297,32 @@ app.layout = dbc.Container(
                                         name="Restaurantes",
                                         checked=True,
                                     ),
-                                    # Camada clusterizada (em losango) com os entregadores do sistema
+                                    # Camadas clusterizadas (em losango): entregadores descartados (cinza) e normais/filtrados (laranja)
                                     dl.Overlay(
-                                        dl.GeoJSON(
-                                            id="geojson-entregadores",
-                                            data=build_riders_geojson(SYSTEM.riders.values()),
-                                            cluster=True,
-                                            zoomToBoundsOnClick=True,
-                                            spiderfyOnMaxZoom=True,
-                                            superClusterOptions={"radius": 70, "maxZoom": 16},
-                                            clusterToLayer=RIDER_CLUSTER_TO_LAYER,
-                                            pointToLayer=RIDER_POINT_TO_LAYER,
+                                        dl.LayerGroup(
+                                            id="layer-group-entregadores",
+                                            children=[
+                                                dl.GeoJSON(
+                                                    id="geojson-entregadores-descartados",
+                                                    data={"type": "FeatureCollection", "features": []},
+                                                    cluster=True,
+                                                    zoomToBoundsOnClick=True,
+                                                    spiderfyOnMaxZoom=True,
+                                                    superClusterOptions={"radius": 70, "maxZoom": 16},
+                                                    clusterToLayer=RIDER_DISCARDED_CLUSTER_TO_LAYER,
+                                                    pointToLayer=RIDER_POINT_TO_LAYER,
+                                                ),
+                                                dl.GeoJSON(
+                                                    id="geojson-entregadores",
+                                                    data=build_riders_geojson(SYSTEM.riders.values()),
+                                                    cluster=True,
+                                                    zoomToBoundsOnClick=True,
+                                                    spiderfyOnMaxZoom=True,
+                                                    superClusterOptions={"radius": 70, "maxZoom": 16},
+                                                    clusterToLayer=RIDER_CLUSTER_TO_LAYER,
+                                                    pointToLayer=RIDER_POINT_TO_LAYER,
+                                                ),
+                                            ],
                                         ),
                                         id="overlay-entregadores",
                                         name="Entregadores",
@@ -360,25 +430,38 @@ def update_bar_dropdown(
     Output("layer-bar-selecionado", "children"),
     Output("map-bh", "viewport"),
     Output("bar-details-container", "children"),
+    Output("nearby-search-results-container", "children", allow_duplicate=True),
+    Output("geojson-entregadores", "data", allow_duplicate=True),
+    Output("geojson-entregadores-descartados", "data", allow_duplicate=True),
     Input("bar-dropdown", "value"),
+    Input("btn-search-nearby-riders", "n_clicks"),
+    Input("input-search-radius-km", "value"),
+    Input("radio-ranking-criterion", "value"),
     Input("btn-reset-view", "n_clicks"),
     Input("bairro-dropdown", "value"),
     prevent_initial_call=True,
 )
 def update_map_and_details(
     selected_bar_id: int | None,
+    _search_clicks: int | None,
+    radius_km: float | None,
+    ranking_criterion: str | None,
     _reset_clicks: int | None,
     selected_bairro: str | None,
 ):
-    """Atualiza a aba 'Bar Selecionado', o pino destacado e a navegação da câmera."""
+    """Atualiza o bar selecionado, o círculo de raio, a busca de entregadores e a câmera."""
     triggered = ctx.triggered_id
+    empty_discarded = {"type": "FeatureCollection", "features": []}
 
-    # 1. Botão de visão geral
+    # 1. Botão de visão geral / limpar filtro
     if triggered == "btn-reset-view":
         return (
             [],
             {"center": BH_CENTER, "zoom": BH_DEFAULT_ZOOM, "transition": "flyTo"},
             render_bar_details(None),
+            render_nearby_search_results(None),
+            build_riders_geojson(SYSTEM.riders.values()),
+            empty_discarded,
         )
 
     # 2. Mudança no filtro de bairro
@@ -391,30 +474,90 @@ def update_map_and_details(
                 [],
                 {"center": [mean_lat, mean_lon], "zoom": 15, "transition": "flyTo"},
                 render_bar_details(None),
+                render_nearby_search_results(None),
+                build_riders_geojson(SYSTEM.riders.values()),
+                empty_discarded,
             )
         return (
             [],
             {"center": BH_CENTER, "zoom": BH_DEFAULT_ZOOM, "transition": "flyTo"},
             render_bar_details(None),
+            render_nearby_search_results(None),
+            build_riders_geojson(SYSTEM.riders.values()),
+            empty_discarded,
         )
 
-    # 3. Bar selecionado (ou desmarcado)
+    # 3. Nenhum bar selecionado (ou desmarcado)
     if selected_bar_id is None:
-        return [], dash.no_update, render_bar_details(None)
+        return (
+            [],
+            dash.no_update,
+            render_bar_details(None),
+            render_nearby_search_results(None),
+            build_riders_geojson(SYSTEM.riders.values()),
+            empty_discarded,
+        )
 
     bar = SYSTEM.get_bar(int(selected_bar_id))
     if bar is None or bar.latitude is None or bar.longitude is None:
-        return [], dash.no_update, render_bar_details(None)
+        return (
+            [],
+            dash.no_update,
+            render_bar_details(None),
+            render_nearby_search_results(None),
+            build_riders_geojson(SYSTEM.riders.values()),
+            empty_discarded,
+        )
+
+    # 4. Validação do raio de atendimento informado na interface
+    if radius_km is None or float(radius_km) <= 0:
+        return (
+            render_highlighted_bar_layer(bar),
+            {"center": [bar.latitude, bar.longitude], "zoom": 16, "transition": "flyTo"},
+            render_bar_details(bar),
+            render_nearby_search_results(bar=bar, invalid_radius=True),
+            build_riders_geojson(SYSTEM.riders.values()),
+            empty_discarded,
+        )
+
+    radius_val = float(radius_km)
+    radius_meters = radius_val * 1000.0
+    zoom_level = get_zoom_for_radius(radius_val)
+    viewport = {"center": [bar.latitude, bar.longitude], "zoom": zoom_level, "transition": "flyTo"}
+
+    # 5. Caso ainda não existam entregadores gerados no sistema
+    if len(SYSTEM.riders) == 0:
+        return (
+            render_highlighted_bar_layer(bar, radius_meters=radius_meters),
+            viewport,
+            render_bar_details(bar),
+            render_nearby_search_results(bar=bar, total_system_riders=0),
+            dash.no_update,
+            empty_discarded,
+        )
+
+    # 6. Executa a busca na Trie (célula + adjacentes), filtra pelo raio e plota filtrados vs descartados clusterizados
+    ranking_by = ranking_criterion if ranking_criterion in ("time", "distance") else "time"
+    search_result = search_and_build_riders_for_bar(SYSTEM, bar, radius_val, ranking_by=ranking_by)
 
     return (
-        render_highlighted_bar_layer(bar),
-        {"center": [bar.latitude, bar.longitude], "zoom": 17, "transition": "flyTo"},
+        render_highlighted_bar_layer(bar, radius_meters=radius_meters),
+        viewport,
         render_bar_details(bar),
+        render_nearby_search_results(
+            bar=bar,
+            search_result=search_result,
+            total_system_riders=len(SYSTEM.riders),
+        ),
+        search_result["geojson_filtered"],
+        search_result["geojson_discarded"],
     )
 
 
 @callback(
     Output("geojson-entregadores", "data"),
+    Output("geojson-entregadores-descartados", "data"),
+    Output("nearby-search-results-container", "children", allow_duplicate=True),
     Output("riders-status-container", "children"),
     Output("rider-progress-container", "style"),
     Output("rider-progress-bar", "value"),
@@ -428,6 +571,9 @@ def update_map_and_details(
     Input("interval-rider-progress", "n_intervals"),
     State("input-num-riders", "value"),
     State("checkbox-clear-riders", "value"),
+    State("bar-dropdown", "value"),
+    State("input-search-radius-km", "value"),
+    State("radio-ranking-criterion", "value"),
     prevent_initial_call=True,
 )
 def handle_generate_riders(
@@ -435,6 +581,9 @@ def handle_generate_riders(
     _n_intervals: int | None,
     num_riders: int | None,
     clear_existing: bool | None,
+    selected_bar_id: int | None,
+    radius_km: float | None,
+    ranking_criterion: str | None,
 ):
     """Gerencia o início e a barra de progresso da geração de entregadores."""
     triggered = ctx.triggered_id
@@ -443,6 +592,8 @@ def handle_generate_riders(
     if triggered == "btn-generate-riders":
         if num_riders is None or int(num_riders) <= 0:
             return (
+                dash.no_update,
+                dash.no_update,
                 dash.no_update,
                 render_riders_status(len(SYSTEM.riders), invalid_input=True),
                 {"display": "none"},
@@ -463,6 +614,8 @@ def handle_generate_riders(
         return (
             dash.no_update,
             dash.no_update,
+            dash.no_update,
+            dash.no_update,
             {"display": "block"},
             0,
             "0%",
@@ -481,6 +634,8 @@ def handle_generate_riders(
         return (
             dash.no_update,
             dash.no_update,
+            dash.no_update,
+            dash.no_update,
             {"display": "block"},
             pct,
             f"{pct}%",
@@ -491,9 +646,28 @@ def handle_generate_riders(
             True,
         )
 
-    # 3. Geração concluída: atualiza o mapa e finaliza a barra em 100%
+    # 3. Geração concluída: se houver um bar selecionado, já aplica a busca e filtragem por raio
+    final_geojson_filtered = state["geojson"]
+    final_geojson_discarded = {"type": "FeatureCollection", "features": []}
+    search_results_ui = dash.no_update
+
+    if selected_bar_id is not None and radius_km is not None and float(radius_km) > 0:
+        bar = SYSTEM.get_bar(int(selected_bar_id))
+        if bar is not None and bar.latitude is not None and bar.longitude is not None:
+            ranking_by = ranking_criterion if ranking_criterion in ("time", "distance") else "time"
+            search_result = search_and_build_riders_for_bar(SYSTEM, bar, float(radius_km), ranking_by=ranking_by)
+            final_geojson_filtered = search_result["geojson_filtered"]
+            final_geojson_discarded = search_result["geojson_discarded"]
+            search_results_ui = render_nearby_search_results(
+                bar=bar,
+                search_result=search_result,
+                total_system_riders=len(SYSTEM.riders),
+            )
+
     return (
-        state["geojson"],
+        final_geojson_filtered,
+        final_geojson_discarded,
+        search_results_ui,
         render_riders_status(
             total_riders=state["total_riders"],
             last_generated=state["generated_so_far"],
