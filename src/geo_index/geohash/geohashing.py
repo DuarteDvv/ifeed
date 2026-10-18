@@ -18,7 +18,7 @@ def geohash_encode(latitude: float, longitude: float, size: int = 8) -> str:
         coordinate = longitude if is_longitude else latitude
         midpoint = (bounds[0] + bounds[1]) / 2
 
-        # cada bit escolhe a metade inferior (0) ou superior (1) do intervalo.
+        # cada bit escolhe a metade inferior (0) ou superior (1) do intervalo
         is_upper_half = coordinate > midpoint
         if is_upper_half:
             bounds[0] = midpoint

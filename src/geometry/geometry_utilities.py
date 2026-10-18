@@ -170,7 +170,7 @@ def split_at_middle(geom):
                 c_esq = coords[:i + 1] + [mid_pt]
                 c_dir = [mid_pt] + coords[i + 1:]
 
-            # TODO
+            # tODO
             # # garante que as sub-geometrias tenham pelo menos dois vértices válidos
             # if len(c_esq) < 2:
             #     c_esq = [c_esq[0], c_esq[0]]

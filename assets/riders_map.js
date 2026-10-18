@@ -1,6 +1,6 @@
-// Funções JavaScript de customização das camadas GeoJSON no Dash-Leaflet
+// funções JavaScript de customização das camadas GeoJSON no Dash-Leaflet
 window.ifeed = Object.assign({}, window.ifeed, {
-    // Renderiza cada cluster de restaurantes com classes de estilo e tooltip informativa
+    // renderiza cada cluster de restaurantes com classes de estilo e tooltip informativa
     barClusterToLayer: function (feature, latlng) {
         var count = feature.properties.point_count;
         var countLabel = feature.properties.point_count_abbreviated;
@@ -24,7 +24,7 @@ window.ifeed = Object.assign({}, window.ifeed, {
         return marker;
     },
 
-    // Renderiza cada cluster de entregadores como um ícone em formato de losango
+    // renderiza cada cluster de entregadores como um ícone em formato de losango
     riderClusterToLayer: function (feature, latlng) {
         var count = feature.properties.point_count;
         var countLabel = feature.properties.point_count_abbreviated;
@@ -48,7 +48,7 @@ window.ifeed = Object.assign({}, window.ifeed, {
         return marker;
     },
 
-    // Renderiza cada cluster de entregadores descartados como um ícone em formato de losango cinza
+    // renderiza cada cluster de entregadores descartados como um ícone em formato de losango cinza
     riderDiscardedClusterToLayer: function (feature, latlng) {
         var count = feature.properties.point_count;
         var countLabel = feature.properties.point_count_abbreviated;
@@ -72,11 +72,13 @@ window.ifeed = Object.assign({}, window.ifeed, {
         return marker;
     },
 
-    // Renderiza entregadores individuais: em destaque (laranja) quando filtrados e em cinza quando descartados
+    // renderiza entregadores individuais: em destaque (laranja) quando filtrados e em cinza quando descartados
     riderPointToLayer: function (feature, latlng) {
         var props = (feature && feature.properties) ? feature.properties : {};
+        var status = props.status || "normal";
         var marker;
-        if (props.status === "discarded") {
+
+        if (status === "discarded") {
             marker = L.circleMarker(latlng, {
                 radius: 5,
                 color: "#d5d8dc",
@@ -84,7 +86,7 @@ window.ifeed = Object.assign({}, window.ifeed, {
                 fillOpacity: 0.55,
                 weight: 1.0
             });
-        } else if (props.status === "filtered") {
+        } else if (status === "filtered") {
             marker = L.circleMarker(latlng, {
                 radius: 7,
                 color: "#ffffff",
@@ -101,12 +103,67 @@ window.ifeed = Object.assign({}, window.ifeed, {
                 weight: 1.5
             });
         }
-        if (props.tooltip) {
-            marker.bindTooltip(props.tooltip);
+
+        // construção dinâmica de tooltip e popup a partir de dados numéricos primitivos
+        var formatDist = function (m) {
+            if (m === null || m === undefined) return null;
+            return m < 1000 ? Math.round(m) + " m" : (m / 1000).toFixed(2) + " km (" + Math.round(m) + " m)";
+        };
+
+        var formatTime = function (min) {
+            if (min === null || min === undefined) return null;
+            if (min < 1.0) {
+                var s = Math.round(min * 60);
+                return (s > 0 ? s : "< 1") + " s";
+            }
+            var mPart = Math.floor(min);
+            var sPart = Math.round((min - mPart) * 60);
+            return sPart > 0 ? mPart + " min " + sPart + " s" : mPart + " min";
+        };
+
+        var lat = latlng.lat.toFixed(6);
+        var lng = latlng.lng.toFixed(6);
+        var id = props.id;
+        var geohash = props.geohash || "N/A";
+        var distVal = props.dist !== undefined ? props.dist : props.distance;
+        var roadDistVal = props.road_dist !== undefined ? props.road_dist : props.road_distance;
+        var timeVal = props.time !== undefined ? props.time : props.estimated_time;
+
+        var tooltipText = "Entregador #" + id;
+        var popupHtml = "";
+
+        if (status === "filtered") {
+            var distStr = formatDist(distVal);
+            var timeStr = formatTime(timeVal);
+            var roadDistStr = formatDist(roadDistVal);
+
+            if (props.ranking_by === "time" && timeStr) {
+                tooltipText = "Entregador #" + id + " — " + timeStr;
+            } else if (distStr) {
+                tooltipText = "Entregador #" + id + " — " + distStr;
+            }
+
+            popupHtml = "<b>Entregador #" + id + "</b> <span style='color:#ff6b00;font-weight:bold;'>(Dentro do raio)</span><br>";
+            if (timeStr) popupHtml += "<b>Tempo de trajeto (ruas):</b> " + timeStr + "<br>";
+            if (roadDistStr) popupHtml += "<b>Distância pelas ruas:</b> " + roadDistStr + "<br>";
+            if (distStr) popupHtml += "<b>Distância em linha reta:</b> " + distStr + "<br>";
+            popupHtml += "<b>Coordenadas:</b> (" + lat + ", " + lng + ")<br>";
+            popupHtml += "<b>Geohash:</b> " + geohash;
+        } else if (status === "discarded") {
+            var distInfo = formatDist(distVal) || "Fora da região";
+            tooltipText = "Entregador #" + id + " (Descartado — " + distInfo + ")";
+            popupHtml = "<b>Entregador #" + id + "</b> <span style='color:#808b96;font-weight:bold;'>(Descartado)</span><br>" +
+                "<b>Distância ao restaurante:</b> " + distInfo + "<br>" +
+                "<b>Coordenadas:</b> (" + lat + ", " + lng + ")<br>" +
+                "<b>Geohash:</b> " + geohash;
+        } else {
+            popupHtml = "<b>Entregador #" + id + "</b><br>" +
+                "<b>Coordenadas:</b> (" + lat + ", " + lng + ")<br>" +
+                "<b>Geohash:</b> " + geohash;
         }
-        if (props.popup) {
-            marker.bindPopup(props.popup);
-        }
+
+        marker.bindTooltip(tooltipText);
+        marker.bindPopup(popupHtml);
         return marker;
     }
 });

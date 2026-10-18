@@ -62,7 +62,7 @@ assert sorted(quotas_1) == [3, 3, 4] and sum(quotas_1) == 10, "Erro quotas 1"
 assert sorted(quotas_2) == [0, 0, 0, 1, 1] and sum(quotas_2) == 2, "Erro quotas 2"
 assert quotas_3 == [0, 0, 0, 0] and sum(quotas_3) == 0, "Erro quotas 3"
 
-# Teste de aleatoriedade da seleção do remainder sem reposição
+# teste de aleatoriedade da seleção do remainder sem reposição
 distinct_selections = set()
 for s in range(50):
     q = calculate_bar_quotas(num_riders=1, num_bars=10, rng=np.random.default_rng(s))

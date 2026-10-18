@@ -98,7 +98,7 @@ print(f"Entregadores dentro do raio de 1000m: {len(nearby_filtered)}")
 assert all(r["within_range"] is True for r in nearby_filtered), "Todos os entregadores retornados devem ter within_range=True"
 assert all(r["distance"] <= 1000.0 for r in nearby_filtered), "Nenhum entregador deve estar a mais de 1000m"
 
-# Teste com radius_km=1.0
+# teste com radius_km=1.0
 nearby_filtered_km = system.search_nearby(12, radius_km=1.0, only_within_range=True)
 assert len(nearby_filtered_km) == len(nearby_filtered), "radius_km=1.0 deve equivaler a radius=1000"
 print("OK: search_nearby filtra perfeitamente candidatos dentro do raio!")

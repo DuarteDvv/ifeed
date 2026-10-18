@@ -75,9 +75,19 @@ def osm_distance_and_time(road_network, candidates, restaurant_location):
                 result["road_distance"] = 0.0
                 result["estimated_time"] = 0.0
             else:
-                edges = ox.routing.route_to_gdf(road_network, route, weight="travel_time")
-                result["road_distance"] = round(float(edges["length"].sum(skipna=False)), 2)
-                result["estimated_time"] = round(float(edges["travel_time"].sum(skipna=False)) / 60, 2)
+                total_length = 0.0
+                total_travel_time = 0.0
+                for u, v in zip(route[:-1], route[1:]):
+                    edge_dict = road_network[u][v]
+                    best_edge = min(
+                        edge_dict.values(),
+                        key=lambda d: d.get("travel_time", float("inf")),
+                    )
+                    total_length += best_edge.get("length", 0.0)
+                    total_travel_time += best_edge.get("travel_time", 0.0)
+
+                result["road_distance"] = round(float(total_length), 2)
+                result["estimated_time"] = round(float(total_travel_time) / 60, 2)
 
         results.append(result)
     return results

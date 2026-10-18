@@ -57,7 +57,7 @@ print("OK: classify_candidates_by_distance com Rider objects")
 
 
 print("\nTeste 5 - median_geometric (Weiszfeld)")
-# Ponto médio simétrico de 4 cantos de um quadrado deve ser o centro (0, 0)
+# ponto médio simétrico de 4 cantos de um quadrado deve ser o centro (0, 0)
 pts_square = [(-10, -10), (10, -10), (10, 10), (-10, 10)]
 med = median_geometric(pts_square)
 assert np.allclose(med, [0.0, 0.0], atol=1e-5)
@@ -66,7 +66,7 @@ print(f"OK: median_geometric obtida {med}")
 
 print("\nTeste 6 - split_points_by_median")
 pts = [(2, 3), (5, 4), (9, 6), (4, 7), (8, 1), (7, 2)]
-# Eixo X (axis=0): ordenados por X são [2, 4, 5, 7, 8, 9]. Mediana (len=6, mid=3) é 7 -> (7, 2)
+# eixo X (axis=0): ordenados por X são [2, 4, 5, 7, 8, 9]. Mediana (len=6, mid=3) é 7 -> (7, 2)
 left_p, med_item, right_p = split_points_by_median(pts, axis=0)
 assert med_item == (7, 2)
 assert len(left_p) == 3

@@ -11,12 +11,12 @@ from src.geo_index.radix_tree.RadixTree import RadixTree
 from src.geometry.geometry_utilities import squared_distance
 from src.models.Bar import Bar
 
-# Constantes geográficas e de interface
+# constantes geográficas e de interface
 BH_CENTER = [-19.9191, -43.9386]
 BH_DEFAULT_ZOOM = 12
 MAX_DROPDOWN_OPTIONS = 100
 
-# Referência à função JavaScript para customização dos clusters de bares/restaurantes
+# referência à função JavaScript para customização dos clusters de bares/restaurantes
 BAR_CLUSTER_TO_LAYER = {"variable": "ifeed.barClusterToLayer"}
 
 
@@ -100,21 +100,21 @@ def find_bar_from_click(
     if not click_data:
         return None
 
-    # 1. Tenta obter propriedades da Feature GeoJSON
+    # 1. tenta obter propriedades da Feature GeoJSON
     props = click_data.get("properties") or {}
     if props.get("cluster"):
         return None
     if "bar_id" in props:
         return system.get_bar(int(props["bar_id"]))
 
-    # 2. Tenta pelo ID direto da Feature
+    # 2. tenta pelo ID direto da Feature
     direct_id = click_data.get("id")
     if direct_id is not None and str(direct_id).isdigit():
         bar = system.get_bar(int(direct_id))
         if bar:
             return bar
 
-    # 3. Tenta extrair coordenadas (GeoJSON geometry [lon, lat] ou latlng)
+    # 3. tenta extrair coordenadas (GeoJSON geometry [lon, lat] ou latlng)
     lat, lon = None, None
     geometry = click_data.get("geometry") or {}
     coords = geometry.get("coordinates")
@@ -130,12 +130,12 @@ def find_bar_from_click(
     if lat is None or lon is None:
         return None
 
-    # Tentativa exata por coordenada arredondada
+    # tentativa exata por coordenada arredondada
     exact_id = coords_index.get((round(float(lat), 6), round(float(lon), 6)))
     if exact_id is not None:
         return system.get_bar(exact_id)
 
-    # Fallback usando squared_distance do módulo de geometria do projeto
+    # fallback usando squared_distance do módulo de geometria do projeto
     target = (float(lat), float(lon))
     closest_bar = min(
         valid_bars,
@@ -241,7 +241,7 @@ def render_highlighted_bar_layer(
         )
 
     layers.extend([
-        # Halo pulsante de destaque ao redor do bar selecionado
+        # halo pulsante de destaque ao redor do bar selecionado
         dl.CircleMarker(
             center=position,
             radius=18,
@@ -250,7 +250,7 @@ def render_highlighted_bar_layer(
             fillOpacity=0.25,
             weight=3,
         ),
-        # Ponto central destacado
+        # ponto central destacado
         dl.CircleMarker(
             center=position,
             radius=8,
@@ -260,7 +260,7 @@ def render_highlighted_bar_layer(
             weight=2,
             children=[
                 dl.Tooltip(
-                    f"📍 {nome_exibicao}",
+                    nome_exibicao,
                     permanent=True,
                     direction="top",
                     offset=[0, -10],

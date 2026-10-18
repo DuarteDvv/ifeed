@@ -1,4 +1,4 @@
-/* Personalizando cores (ex: paleta em tons de azul e roxo em vez do verde/amarelo padrão) */
+/* personalizando cores (ex: paleta em tons de azul e roxo em vez do verde/amarelo padrão) */
 .marker-cluster-large {
     background-color: rgba(215, 71, 159, 0.8) !important;
 }
@@ -31,7 +31,7 @@
     transition: width 0.08s linear !important;
 }
 
-/* Clusters de entregadores em formato de losango */
+/* clusters de entregadores em formato de losango */
 .rider-cluster {
     background: transparent !important;
     border: none !important;
@@ -54,7 +54,7 @@
     line-height: 1;
 }
 
-/* Desfaz a rotação de 45 graus apenas no texto para que o número fique na horizontal */
+/* desfaz a rotação de 45 graus apenas no texto para que o número fique na horizontal */
 .rider-cluster-diamond span {
     display: inline-block;
     transform: rotate(-45deg);
@@ -78,7 +78,7 @@
     background-color: rgba(216, 67, 21, 0.5);
 }
 
-/* Clusters de entregadores descartados (cinza) */
+/* clusters de entregadores descartados (cinza) */
 .rider-cluster-discarded.rider-cluster-small .rider-cluster-diamond {
     width: 28px;
     height: 28px;
@@ -100,7 +100,7 @@
     border: 2px solid #eaeded;
 }
 
-/* Estilo das seções colapsáveis (Accordion) do painel lateral */
+/* estilo das seções colapsáveis (Accordion) do painel lateral */
 .accordion-button {
     font-size: 0.92rem !important;
     font-weight: 600 !important;

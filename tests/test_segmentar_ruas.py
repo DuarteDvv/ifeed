@@ -17,14 +17,14 @@ from preprocessing.segmentar_ruas_bh import (
 
 
 print("Teste 1 - Arestas curtas (apenas 1 ponto médio)")
-# Aresta de 40m: dividida em duas metades de 20m (<= 50m). Deve parar com 1 ponto.
+# aresta de 40m: dividida em duas metades de 20m (<= 50m). Deve parar com 1 ponto
 line_40m = LineString([(0, 0), (0, 40)])
 pts_40m = segmentar_aresta(line_40m, comprimento=40.0, max_comprimento=50.0)
 print("Aresta 40m - quantidade de pontos esperada: 1, obtida:", len(pts_40m))
 assert len(pts_40m) == 1, "Deveria ter gerado exatamente 1 ponto"
 assert pts_40m[0].x == 0 and pts_40m[0].y == 20, "O ponto gerado deve ser o ponto médio exato (0, 20)"
 
-# Aresta de 80m: dividida em duas metades de 40m (<= 50m). Deve parar com 1 ponto.
+# aresta de 80m: dividida em duas metades de 40m (<= 50m). Deve parar com 1 ponto
 line_80m = LineString([(0, 0), (0, 80)])
 pts_80m = segmentar_aresta(line_80m, comprimento=80.0, max_comprimento=50.0)
 print("Aresta 80m - quantidade de pontos esperada: 1, obtida:", len(pts_80m))
@@ -33,8 +33,8 @@ assert pts_80m[0].x == 0 and pts_80m[0].y == 40, "O ponto gerado deve ser o pont
 
 
 print("\nTeste 2 - Bipartição recursiva com aresta de 120 metros")
-# 120m -> metades de 60m (> 50m) -> quartos de 30m (<= 50m).
-# Deve gerar 3 pontos: em 25% (30m), 50% (60m) e 75% (90m).
+# 120m -> metades de 60m (> 50m) -> quartos de 30m (<= 50m)
+# deve gerar 3 pontos: em 25% (30m), 50% (60m) e 75% (90m)
 line_120m = LineString([(0, 0), (0, 120)])
 pts_120m = segmentar_aresta(line_120m, comprimento=120.0, max_comprimento=50.0)
 y_coords_120m = sorted([round(p.y, 2) for p in pts_120m])
@@ -45,8 +45,8 @@ assert y_coords_120m == [30.0, 60.0, 90.0], "Pontos de bipartição incorretos"
 
 
 print("\nTeste 3 - Bipartição recursiva com aresta longa de 240 metros")
-# 240m -> metades de 120m -> quartos de 60m -> oitavos de 30m (<= 50m).
-# Total de pontos: 2^3 - 1 = 7 pontos.
+# 240m -> metades de 120m -> quartos de 60m -> oitavos de 30m (<= 50m)
+# total de pontos: 2^3 - 1 = 7 pontos
 line_240m = LineString([(0, 0), (0, 240)])
 pts_240m = segmentar_aresta(line_240m, comprimento=240.0, max_comprimento=50.0)
 y_coords_240m = sorted([round(p.y, 2) for p in pts_240m])
@@ -58,9 +58,9 @@ assert y_coords_240m == [30.0 * i for i in range(1, 8)], "Pontos de bipartição
 
 
 print("\nTeste 4 - Preservação da curvatura da via vs linha reta")
-# Rota em L: (0, 0) -> (0, 50) -> (50, 50). Comprimento total = 100m.
-# Se cortasse em linha reta de (0, 0) a (50, 50), o ponto médio seria (25, 25).
-# Como segue a curva, o ponto médio (50%) está exatamente na quina (0, 50).
+# rota em L: (0, 0) -> (0, 50) -> (50, 50). Comprimento total = 100m
+# se cortasse em linha reta de (0, 0) a (50, 50), o ponto médio seria (25, 25)
+# como segue a curva, o ponto médio (50%) está exatamente na quina (0, 50)
 curva_l = LineString([(0, 0), (0, 50), (50, 50)])
 pts_curva = segmentar_aresta(curva_l, comprimento=100.0, max_comprimento=50.0)
 assert len(pts_curva) == 1, "Deveria ter gerado 1 ponto médio"
@@ -76,11 +76,11 @@ G.add_node(1, x=-43.93, y=-19.92)
 G.add_node(2, x=-43.93, y=-19.91)  # reta de ~1100m
 G.add_node(3, x=-43.94, y=-19.91)
 
-# Aresta 1: curta (40m) sem geometry explícita
+# aresta 1: curta (40m) sem geometry explícita
 G.add_edge(1, 3, key=0, length=40.0, osmid=1001, name="Rua Curta")
-# Aresta 2: média (120m) sem geometry explícita
+# aresta 2: média (120m) sem geometry explícita
 G.add_edge(3, 2, key=0, length=120.0, osmid=1002, name="Rua Média")
-# Aresta 3: curva com 3 vértices
+# aresta 3: curva com 3 vértices
 geom_curva = LineString([(-43.93, -19.92), (-43.935, -19.915), (-43.93, -19.91)])
 G.add_edge(1, 2, key=0, length=120.0, geometry=geom_curva, osmid=1003, name="Avenida Curva")
 
@@ -88,11 +88,11 @@ df = gerar_dataset_pontos_ruas(G, max_comprimento=50.0)
 print("Shape do DataFrame:", df.shape)
 print("Colunas presentes:", list(df.columns))
 
-# Validações das colunas
+# validações das colunas
 colunas_esperadas = ["latitude", "longitude", "u", "v", "key", "edge_id", "osmid", "name", "original_length"]
 assert list(df.columns) == colunas_esperadas, "Colunas do DataFrame não correspondem ao esperado"
 
-# Contagem esperada: 1 ponto (aresta curta) + 3 pontos (aresta média) + 3 pontos (aresta curva) = 7 pontos
+# contagem esperada: 1 ponto (aresta curta) + 3 pontos (aresta média) + 3 pontos (aresta curva) = 7 pontos
 assert len(df) == 7, f"Esperado 7 pontos no grafo simulado, obtido {len(df)}"
 assert set(df["name"]) == {"Rua Curta", "Rua Média", "Avenida Curva"}, "Nomes das ruas incorretos"
 assert df["latitude"].notna().all() and df["longitude"].notna().all(), "Coordenadas com valores nulos"

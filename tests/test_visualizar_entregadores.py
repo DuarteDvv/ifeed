@@ -67,10 +67,10 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
     """Plota as lojas e os entregadores em um mapa, exibindo a dispersão normal em torno de cada loja."""
     fig, (ax_mapa, ax_zoom) = plt.subplots(1, 2, figsize=(16, 7), gridspec_kw={"width_ratios": [1.2, 1]})
 
-    # Paleta de cores para identificar cada cluster de loja/entregadores
+    # paleta de cores para identificar cada cluster de loja/entregadores
     cores = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
 
-    # Identifica a qual loja cada entregador pertence usando a menor distância
+    # identifica a qual loja cada entregador pertence usando a menor distância
     entregadores_por_loja = {loja.id: [] for loja in lojas}
     for r in entregadores:
         loja_mais_proxima = min(
@@ -79,7 +79,7 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
         )
         entregadores_por_loja[loja_mais_proxima.id].append(r)
 
-    # 1. Painel da esquerda: Visão Geral de Belo Horizonte
+    # 1. painel da esquerda: Visão Geral de Belo Horizonte
     for i, loja in enumerate(lojas):
         cor = cores[i % len(cores)]
         riders_loja = entregadores_por_loja[loja.id]
@@ -87,14 +87,14 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
         lats = [r.latitude for r in riders_loja]
         lons = [r.longitude for r in riders_loja]
 
-        # Entregadores (nuvem de dispersão)
+        # entregadores (nuvem de dispersão)
         ax_mapa.scatter(
             lons, lats,
             color=cor, alpha=0.5, s=20,
             label=f"Entregadores ({loja.bairro}) - {len(riders_loja)} pts",
         )
 
-        # Loja (estrela destacada)
+        # loja (estrela destacada)
         ax_mapa.scatter(
             loja.longitude, loja.latitude,
             color=cor, edgecolor="black", marker="*", s=300, linewidth=1.5,
@@ -107,7 +107,7 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
     ax_mapa.grid(True, linestyle="--", alpha=0.5)
     ax_mapa.legend(loc="upper left", fontsize=9, framealpha=0.9)
 
-    # 2. Painel da direita: Zoom detalhado em uma das lojas (Savassi) com círculos de 1σ e 2σ
+    # 2. painel da direita: Zoom detalhado em uma das lojas (Savassi) com círculos de 1σ e 2σ
     loja_foco = lojas[0]
     riders_foco = entregadores_por_loja[loja_foco.id]
     cor_foco = cores[0]
@@ -122,7 +122,7 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
         label=f"Loja: {loja_foco.nome}", zorder=10,
     )
 
-    # Círculos de dispersão teóricos: 1σ (500m) e 2σ (1000m)
+    # círculos de dispersão teóricos: 1σ (500m) e 2σ (1000m)
     raio_1sigma_deg = std_dev_meters / METERS_PER_DEGREE
     raio_2sigma_deg = (2 * std_dev_meters) / METERS_PER_DEGREE
 
@@ -135,7 +135,7 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
     ax_zoom.plot(c1_lon, c1_lat, "r--", linewidth=2, label=f"Raio 1σ ({int(std_dev_meters)}m)")
     ax_zoom.plot(c2_lon, c2_lat, "m:", linewidth=2, label=f"Raio 2σ ({int(2 * std_dev_meters)}m)")
 
-    # Estatística observada no cluster
+    # estatística observada no cluster
     dists = [
         math.sqrt((r.latitude - loja_foco.latitude) ** 2 + (r.longitude - loja_foco.longitude) ** 2) * METERS_PER_DEGREE
         for r in riders_foco
@@ -157,7 +157,7 @@ def plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=500.0, caminho_
     plt.savefig(caminho_saida, dpi=200)
     print(f"[OK] Imagem do mapa salva com sucesso em: {caminho_saida}")
 
-    # Exibe a janela gráfica interativa se houver display disponível
+    # exibe a janela gráfica interativa se houver display disponível
     try:
         plt.show()
     except Exception:
@@ -223,22 +223,22 @@ def gerar_mapa_interativo_leaflet(lojas, entregadores, std_dev_meters=500.0, cam
 
         const dados = {dados_str};
         dados.forEach(loja => {{
-            // Marcador da loja
+            // marcador da loja
             L.circleMarker([loja.lat, loja.lon], {{
                 radius: 10, fillColor: loja.cor, color: '#000', weight: 2, fillOpacity: 1
             }}).addTo(map).bindPopup(`<b>${{loja.nome}}</b> (${{loja.bairro}})`);
 
-            // Raio de 1 sigma (500m)
+            // raio de 1 sigma (500m)
             L.circle([loja.lat, loja.lon], {{
                 radius: {std_dev_meters}, color: loja.cor, weight: 2, dashArray: '5, 5', fillOpacity: 0.1
             }}).addTo(map);
 
-            // Raio de 2 sigma (1000m)
+            // raio de 2 sigma (1000m)
             L.circle([loja.lat, loja.lon], {{
                 radius: {2*std_dev_meters}, color: loja.cor, weight: 1.5, dashArray: '2, 6', fill: false
             }}).addTo(map);
 
-            // Marcadores dos entregadores
+            // marcadores dos entregadores
             loja.riders.forEach(r => {{
                 L.circleMarker([r.lat, r.lon], {{
                     radius: 4, fillColor: loja.cor, color: '#fff', weight: 1, fillOpacity: 0.75
@@ -257,13 +257,13 @@ def gerar_mapa_interativo_leaflet(lojas, entregadores, std_dev_meters=500.0, cam
 def main():
     print("=== Teste Visual da Geração de Entregadores (Distribuição Normal) ===")
 
-    # 1. Criação das lojas de exemplo
+    # 1. criação das lojas de exemplo
     lojas = criar_lojas_exemplo()
     print(f"Lojas de exemplo criadas: {len(lojas)}")
     for l in lojas:
         print(f" - {l.nome} ({l.bairro}): ({l.latitude}, {l.longitude})")
 
-    # 2. Geração de múltiplos entregadores (ex: 800 entregadores distribuídos nas 4 lojas)
+    # 2. geração de múltiplos entregadores (ex: 800 entregadores distribuídos nas 4 lojas)
     total_entregadores = 800
     std_dev_meters = 500.0
     print(f"\nGerando {total_entregadores} entregadores (desvio padrão: {std_dev_meters}m)...")
@@ -274,12 +274,12 @@ def main():
         seed=123,
     )
 
-    # 3. Validações numéricas
+    # 3. validações numéricas
     assert len(entregadores) == total_entregadores, f"Esperado {total_entregadores}, obtido {len(entregadores)}"
     assert len(set(r.id for r in entregadores)) == total_entregadores, "IDs duplicados encontrados"
     print(f"Total de entregadores gerados: {len(entregadores)} com IDs únicos.")
 
-    # 4. Plotagem dos mapas
+    # 4. plotagem dos mapas
     print("\nPlotando posições no mapa...")
     plotar_mapa_entregadores(lojas, entregadores, std_dev_meters=std_dev_meters)
     gerar_mapa_interativo_leaflet(lojas, entregadores, std_dev_meters=std_dev_meters)
