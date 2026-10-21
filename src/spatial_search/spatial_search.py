@@ -25,9 +25,7 @@ def select_geohash_prefix_size(radius_meters: float) -> int:
     """Seleciona o tamanho de prefixo Geohash cuja grade 3x3 cobre integralmente o raio em metros."""
     if radius_meters <= 600.0:
         return 6
-    if radius_meters <= 4500.0:
-        return 5
-    return 4
+    return 5
 
 
 def search_candidates(tree, bar_geohash, prefix_size: int = 6):

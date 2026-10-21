@@ -85,13 +85,6 @@ class KDTree:
 
         return best["node"], math.sqrt(best["dist_sq"])
 
-    
-    def nearest(self, target):
-        "método de conveniência que retorna apenas o nó mais próximo do alvo, sem a distância"
-
-        node, _ = self.find_nearest(target)
-        return node
-
 
     def _search_nearest(self, current, target_coords, best):
         "realiza a busca recursiva do vizinho mais próximo com poda de ramos distantes"

@@ -212,7 +212,7 @@ def project_rider_to_nearest_street(
 ) -> Rider:
     """encontra o ponto de segmentação mais próximo e projeta o entregador na respectiva rua"""
     rider_coords = (rider.latitude, rider.longitude)
-    nearest_node = kdtree.nearest(rider_coords)
+    nearest_node, _ = kdtree.find_nearest(rider_coords)
     if nearest_node is None:
         return rider
 
