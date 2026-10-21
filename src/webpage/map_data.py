@@ -1,4 +1,4 @@
-"""Publica GeoJSON comprimido sem enviá-lo pelas respostas de callbacks do Dash."""
+"""Publica GeoJSON comprimido sem enviar ele pelas respostas de callbacks do Dash"""
 
 import gzip
 import json
@@ -16,11 +16,8 @@ _EMPTY_PAYLOAD = gzip.compress(b'{"type":"FeatureCollection","features":[]}', mt
 
 
 def create_map_url(geojson: dict, *, full_map: bool = False) -> str:
-    """Comprime o mapa uma vez e devolve a URL para o Leaflet carregá-lo.
+    "comprime o mapa uma vez e devolve a URL para o leaflet carregar"
 
-    O mapa completo permanece disponível ao limpar os filtros. Os resultados
-    de buscas antigas são descartados para limitar o uso de memória.
-    """
     global _FULL_MAP_ID
     if not geojson.get("features"):
         return EMPTY_MAP_URL
@@ -31,7 +28,7 @@ def create_map_url(geojson: dict, *, full_map: bool = False) -> str:
         _COMPRESSED_MAPS[token] = compressed_data
         if full_map:
             _FULL_MAP_ID = token
-        # dict preserva a ordem de inserção: removemos primeiro as buscas mais antigas.
+        # dict preserva a ordem de inserção, então removemos primeiro as buscas mais antigas
         while len(_COMPRESSED_MAPS) > _MAX_COMPRESSED_MAPS:
             oldest = next(key for key in _COMPRESSED_MAPS if key != _FULL_MAP_ID)
             del _COMPRESSED_MAPS[oldest]
@@ -39,7 +36,8 @@ def create_map_url(geojson: dict, *, full_map: bool = False) -> str:
 
 
 def register_map_route(server) -> None:
-    """Entrega o GeoJSON comprimido pela URL criada acima."""
+    "entrega o GeoJSON comprimido pela url criada acima"
+    
     @server.get("/_ifeed/rider-map/<token>.geojson")
     def rider_map_data(token: str):
         with _LOCK:

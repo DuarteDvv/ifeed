@@ -1,4 +1,4 @@
-""" Implementação de uma árvore radix (ou trie compacta) para armazenar chaves (geohashes) e seus respectivos IDs
+""" Implementação de uma árvore radix (ou trie compacta) para armazenar geohashes e seus respectivos IDs
 """
 from src.geo_index.radix_tree.Node import RadixTreeNode
 
@@ -7,7 +7,7 @@ class RadixTree:
         self.root = RadixTreeNode()
 
     def _common_prefix(self, str1, str2):
-        """retorna o prefixo comum mais longo entre duas strings"""
+        "retorna o prefixo comum mais longo entre duas strings"
 
         min_length = min(len(str1), len(str2))
         for i in range(min_length):
@@ -17,8 +17,6 @@ class RadixTree:
 
 
     def insert(self, key, id):
-        """Insere uma chave (geohash) e seu ID na árvore radix"""
-
         key = key + "$" # simbolo fora do vocabulário que indica o final da chave
 
         current_node = self.root
@@ -72,15 +70,13 @@ class RadixTree:
                 return
 
     def _collect_ids(self, node):
-        """Retorna os IDs armazenados nas folhas abaixo do nó."""
-
         ids = list(node.ids)
         for child_node in node.children.values():
             ids.extend(self._collect_ids(child_node)) # junta os IDs das folhas abaixo do nó filho
         return ids
 
     def search_prefix(self, key):
-        """Buscar IDs de um prefixo especifico, ou seja, subarvores"""
+        "buscar IDs de um prefixo especifico, ou seja, subarvores"
 
         if key is None or key == "":
             return None

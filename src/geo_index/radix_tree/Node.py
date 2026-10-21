@@ -1,6 +1,6 @@
 """Nó da arvore radix
-- Ao invés de criar 2 tipos de nós (nós internos e nós folhas), por simplicidade todos os nós são do mesmo tipo, mas apenas os nós folhas (sem filhos) 
-possuem ids e isso gasta um pouco mais de memória por causa dos ponteiros de lista vazia
+(Ao invés de criar 2 tipos de nós (nós internos e nós folhas), por simplicidade todos os nós são do mesmo tipo, mas apenas os nós folhas 
+possuem ids e isso gasta um pouco mais de memória por causa dos ponteiros de lista vazia)
 """
 
 class RadixTreeNode:

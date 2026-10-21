@@ -72,12 +72,6 @@ class DeliverySystem:
         radius_km: float | None = None,
         only_within_range: bool = False,
     ):
-        """Busca entregadores próximos ao bar, com raio informado em metros ou km
-
-        Retorna None se o bar não existir ou não tiver coordenadas
-        Retorna uma lista, possivelmente vazia, para consultas válidas
-        Se only_within_range=True, filtra apenas os entregadores contidos no raio de atendimento
-        """
         bar = self.get_bar(bar_id)
         if bar is None or bar.latitude is None or bar.longitude is None:
             return None
@@ -110,7 +104,7 @@ class DeliverySystem:
 
 
     def load_bars(self):
-        """carrega os bares de data/bares_final.csv.gz e calcula seus geohashes"""
+        "carrega os bares e calcula seus geohashes"
 
         csv_path = "data/bares_final.csv.gz"
 

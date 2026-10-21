@@ -76,7 +76,7 @@ def sample_normal_coordinates(
     std_dev_meters: float,
     rng: np.random.Generator,
 ) -> list[tuple[float, float]]:
-    """gera coordenadas com variação normal em metros em torno de um ponto central"""
+    "gera coordenadas com variação normal em metros em torno de um ponto central"
     if count <= 0:
         return []
 
@@ -97,7 +97,7 @@ def build_rider(
     longitude: float,
     geohash_size: int = 8,
 ) -> Rider:
-    """instancia um rider com suas coordenadas e geohash calculado"""
+    "instancia um rider com suas coordenadas e geohash calculado"
     rider_geohash = geohash_encode(latitude, longitude, size=geohash_size)
     return Rider(
         id=rider_id,
@@ -113,13 +113,14 @@ def extract_street_coords(
     edge_data: dict[str, Any],
     nodes: Any,
 ) -> tuple[tuple[float, float], ...]:
-    """extrai a sequência de vértices (latitude, longitude) que compõem a geometria de uma rua"""
+    "extrai a sequência de vértices que compõem a geometria de uma rua"
+
     geom = edge_data.get("geometry")
     if geom is not None and hasattr(geom, "coords"):
         # no grafo do osmnx, geom.coords armazena pares na ordem (longitude, latitude)
         return tuple((float(lat), float(lon)) for lon, lat in geom.coords)
 
-    # caso não haja geometria explícita, a rua é o segmento reto entre os nós u e v
+    # caso não haja geometria explicitamente, a rua é o segmento entre os nós u e v
     u_node = nodes[u]
     v_node = nodes[v]
     return (
@@ -131,7 +132,8 @@ def extract_street_coords(
 def build_street_geometries_map(
     road_network: Any,
 ) -> dict[str, tuple[tuple[float, float], ...]]:
-    """constrói um dicionário mapeando o edge_id de cada rua para os seus vértices"""
+    "constrói um dicionário mapeando o edge_id de cada rua para os seus vértices"
+
     nodes = road_network.nodes
     street_geometries: dict[str, tuple[tuple[float, float], ...]] = {}
 
@@ -146,7 +148,8 @@ def get_street_geometries(
     road_network: Any = None,
     graph_path: str = DEFAULT_GRAPH_PATH,
 ) -> dict[str, tuple[tuple[float, float], ...]]:
-    """obtém e armazena em cache o dicionário de geometrias das ruas da malha viária"""
+    "obtém e armazena em cache o dicionário de geometrias das ruas da malha viária"
+
     if graph_path in _CACHED_STREET_GEOMETRIES:
         return _CACHED_STREET_GEOMETRIES[graph_path]
 
@@ -161,7 +164,8 @@ def get_street_geometries(
 def load_segmentation_points(
     segments_path: str = DEFAULT_SEGMENTS_PATH,
 ) -> list[tuple[tuple[float, float], str]]:
-    """carrega os pontos de segmentação de ruas e seus respectivos edge_id a partir do csv"""
+    "carrega os pontos de segmentação de ruas e seus respectivos edge_id a partir do csv"
+
     points: list[tuple[tuple[float, float], str]] = []
 
     open_fn = gzip.open if segments_path.endswith(".gz") else open
@@ -179,7 +183,6 @@ def load_segmentation_points(
 def get_segments_kdtree(
     segments_path: str = DEFAULT_SEGMENTS_PATH,
 ) -> KDTree:
-    """obtém ou constrói em cache a kd-tree dos pontos de segmentação de ruas"""
     if segments_path not in _CACHED_KDTREES:
         points = load_segmentation_points(segments_path=segments_path)
         _CACHED_KDTREES[segments_path] = KDTree(points)
@@ -191,7 +194,8 @@ def resolve_street_coords(
     node_data: Any,
     street_geometries: dict[str, tuple[tuple[float, float], ...]] | None = None,
 ) -> Any:
-    """recupera a geometria da rua associada ao dado armazenado no nó da kd-tree"""
+    "recupera a geometria da rua associada ao dado armazenado no nó da kd-tree"
+
     if isinstance(node_data, str) and street_geometries is not None:
         return street_geometries.get(node_data)
 
@@ -210,7 +214,8 @@ def project_rider_to_nearest_street(
     street_geometries: dict[str, tuple[tuple[float, float], ...]] | None = None,
     geohash_size: int = 8,
 ) -> Rider:
-    """encontra o ponto de segmentação mais próximo e projeta o entregador na respectiva rua"""
+    "encontra o ponto de segmentação mais próximo e projeta o entregador na respectiva rua"
+
     rider_coords = (rider.latitude, rider.longitude)
     nearest_node, _ = kdtree.find_nearest(rider_coords)
     if nearest_node is None:
@@ -222,7 +227,6 @@ def project_rider_to_nearest_street(
     else:
         proj_lat, proj_lon = nearest_node.coords
 
-    # atualiza a posição do entregador e recalcula seu geohash
     rider.latitude = float(proj_lat)
     rider.longitude = float(proj_lon)
     rider.geohash = geohash_encode(rider.latitude, rider.longitude, size=geohash_size)
@@ -238,7 +242,6 @@ def snap_riders_to_streets(
     graph_path: str = DEFAULT_GRAPH_PATH,
     geohash_size: int = 8,
 ) -> list[Rider]:
-    """ajusta a posição de uma coleção de entregadores projetando-os nas ruas mais próximas"""
     riders_list = list(riders)
     if not riders_list:
         return []
@@ -309,7 +312,7 @@ def generate_riders_data(
             riders.append(rider)
             current_id += 1
 
-    # corrige a posição de cada entregador para a projeção na rua do ponto de segmentação mais próximo
+    # corrige a posição de cada entregador projetando eles em suas ruas mais próximas
     snap_riders_to_streets(
         riders=riders,
         kdtree=kdtree,

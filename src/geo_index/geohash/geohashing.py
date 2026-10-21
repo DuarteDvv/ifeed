@@ -5,7 +5,6 @@ _BITS = (16, 8, 4, 2, 1)
 
 
 def geohash_encode(latitude: float, longitude: float, size: int = 8) -> str:
-    """Converte latitude e longitude em um geohash."""
     latitude_bounds = [-90.0, 90.0]
     longitude_bounds = [-180.0, 180.0]
     characters = []
@@ -18,7 +17,6 @@ def geohash_encode(latitude: float, longitude: float, size: int = 8) -> str:
         coordinate = longitude if is_longitude else latitude
         midpoint = (bounds[0] + bounds[1]) / 2
 
-        # cada bit escolhe a metade inferior (0) ou superior (1) do intervalo
         is_upper_half = coordinate > midpoint
         if is_upper_half:
             bounds[0] = midpoint
@@ -37,7 +35,8 @@ def geohash_encode(latitude: float, longitude: float, size: int = 8) -> str:
     return "".join(characters)
 
 def geohash_decode_bounds(geohash: str) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Converte um geohash para os limites de latitude e longitude da box delimitadora"""
+    "converte um geohash para os limites de latitude e longitude da box delimitadora"
+
     latitude_bounds = [-90.0, 90.0]
     longitude_bounds = [-180.0, 180.0]
     is_longitude = True
@@ -59,7 +58,8 @@ def geohash_decode_bounds(geohash: str) -> tuple[tuple[float, float], tuple[floa
     return (latitude_bounds[0], latitude_bounds[1]), (longitude_bounds[0], longitude_bounds[1])
 
 def geohash_decode(geohash: str) -> tuple[float, float]:
-    """converte um geohash para (latitude, longitude)"""
+    "converte um geohash para coordenadas"
+
     latitude_bounds, longitude_bounds = geohash_decode_bounds(geohash)
 
     latitude = (latitude_bounds[0] + latitude_bounds[1]) / 2
@@ -67,10 +67,7 @@ def geohash_decode(geohash: str) -> tuple[float, float]:
     return latitude, longitude
 
 def get_geohash_neighbors(key, size: int = 6):
-    """Retorna o centro do geohash dos 8 vizinhos do geohash fornecido. 
-    - Poderia ter o caso de estarmos no limite das coordenadas, então alguns vizinhos poderiam não existir mas por 
-    pelo fato de ser apenas belo horizonte isso não é um problema
-    """
+    "retorna o centro do geohash dos 8 vizinhos do geohash fornecido"
 
     prefix = key[:size]
 

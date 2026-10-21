@@ -1,4 +1,4 @@
-"""Busca espacial, classificação por raio e estimativas pela malha viária."""
+"""Busca espacial, classificação por raio e estimativas pela malha viária"""
 
 import osmnx as ox
 
@@ -22,14 +22,14 @@ __all__ = [
 
 
 def select_geohash_prefix_size(radius_meters: float) -> int:
-    """Seleciona o tamanho de prefixo Geohash cuja grade 3x3 cobre integralmente o raio em metros."""
+    "seleciona o tamanho de prefixo Geohash cuja grade 3x3 cobre integralmente o raio em metros"
     if radius_meters <= 600.0:
         return 6
     return 5
 
 
 def search_candidates(tree, bar_geohash, prefix_size: int = 6):
-    """Retorna IDs únicos da célula do bar e das oito vizinhas."""
+    "retorna IDs da célula do bar e das oito vizinhas"
     if not bar_geohash:
         return []
 

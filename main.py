@@ -1,12 +1,3 @@
-r"""Interface web interativa do iFeed usando Dash e Dash-Leaflet.
-
-Exibe o mapa de Belo Horizonte com os bares de data/bares_final.csv.gz
-e permite buscar bares por nome, nome fantasia, endereço, bairro ou ID.
-
-Execute com:
-    .\.venv\Scripts\python.exe main.py
-"""
-
 import dash
 from dash import Input, Output, State, callback, ctx, dcc, html
 import dash_bootstrap_components as dbc
@@ -69,7 +60,7 @@ def get_all_riders_map_url() -> str:
     return get_rider_generation_state()["map_url"] or EMPTY_MAP_URL
 
 
-# inicialização do app Dash com tema Bootstrap moderno
+# inicialização do app dash
 app = dash.Dash(
     __name__,
     title="iFeed - Mapa de Bares de BH",
@@ -114,7 +105,7 @@ app.layout = dbc.Container(
                         ]),
                         html.Hr(className="my-3"),
 
-                        # barra de progresso de inicialização da malha viária e KD-Tree
+                        # barra de progresso de inicialização
                         render_initialization_progress(),
                         dcc.Interval(
                             id="interval-init-progress",
@@ -133,14 +124,13 @@ app.layout = dbc.Container(
                             className="small mb-3",
                         ),
 
-                        # seções colapsáveis: Bares e Entregadores
+                        # seções colapsáveis
                         dbc.Accordion(
                             [
                                 dbc.AccordionItem(
                                     item_id="section-bares",
                                     title="Buscar e Visualizar Bares",
                                     children=[
-                                        # 1. filtro opcional por bairro
                                         html.Label("Filtrar por Bairro:", className="fw-semibold small mb-1"),
                                         dcc.Dropdown(
                                             id="bairro-dropdown",
@@ -151,11 +141,11 @@ app.layout = dbc.Container(
                                             className="mb-3 small",
                                         ),
 
-                                        # 2. busca por bar específico
                                         html.Label(
                                             "Buscar Bar (nome, endereço ou ID):",
                                             className="fw-semibold small mb-1",
                                         ),
+
                                         dcc.Dropdown(
                                             id="bar-dropdown",
                                             options=INITIAL_DROPDOWN_OPTIONS,
@@ -171,8 +161,6 @@ app.layout = dbc.Container(
                                             className="text-muted d-block mb-3",
                                             style={"fontSize": "0.75rem"},
                                         ),
-
-                                        # 3. parâmetro de raio de atendimento e busca de entregadores
                                         html.Label(
                                             "Raio de Atendimento (km):",
                                             className="fw-semibold small mb-1",
@@ -203,7 +191,6 @@ app.layout = dbc.Container(
                                             className="w-100 fw-semibold mb-2",
                                         ),
 
-                                        # botão para voltar à visão geral de BH e limpar filtro
                                         dbc.Button(
                                             "Visão Geral de BH / Limpar Filtro",
                                             id="btn-reset-view",
@@ -229,7 +216,7 @@ app.layout = dbc.Container(
                             className="shadow-sm",
                         ),
 
-                        # controles de visibilidade das camadas no mapa
+                        # controles de visibilidade das camadas
                         html.Div(
                             className="mt-3 p-3 bg-light rounded border",
                             children=[
@@ -255,7 +242,7 @@ app.layout = dbc.Container(
                     ],
                 ),
 
-                # área principal com o mapa Dash-Leaflet
+                # área principal com o mapa
                 dbc.Col(
                     width=12,
                     md=8,
@@ -278,7 +265,7 @@ app.layout = dbc.Container(
                                     id="layers-control",
                                     overlays=["Restaurantes", "Entregadores"],
                                     children=[
-                                        # camada clusterizada com os bares de BH
+                                        # camada clusterizada dos bares
                                     dl.Overlay(
                                         dl.GeoJSON(
                                             id="geojson-bares",
@@ -293,7 +280,7 @@ app.layout = dbc.Container(
                                         name="Restaurantes",
                                         checked=True,
                                     ),
-                                    # camadas clusterizadas (em losango): entregadores descartados (cinza) e normais/filtrados (laranja)
+                                    # camadas clusterizadas dos entregadores
                                     dl.Overlay(
                                         dl.LayerGroup(
                                             id="layer-group-entregadores",
@@ -326,7 +313,7 @@ app.layout = dbc.Container(
                                         checked=True,
                                     ),
                                 ]),
-                                # camada de destaque para o bar selecionado na busca
+
                                 dl.LayerGroup(id="layer-bar-selecionado"),
                             ],
                         ),
@@ -421,7 +408,6 @@ app.clientside_callback(
     Input("switch-toggle-bares", "value"),
 )
 def toggle_restaurants_visibility(show_restaurants: bool | None) -> bool:
-    """Controla a visibilidade da camada de restaurantes no mapa."""
     return bool(show_restaurants)
 
 
@@ -430,7 +416,6 @@ def toggle_restaurants_visibility(show_restaurants: bool | None) -> bool:
     Input("switch-toggle-entregadores", "value"),
 )
 def toggle_riders_visibility(show_riders: bool | None) -> bool:
-    """Controla a visibilidade da camada de entregadores no mapa."""
     return bool(show_riders)
 
 
@@ -474,9 +459,8 @@ def update_nearby_search_availability(ready: bool, selected_bar_id: int | None):
     Input("riders-ready", "data"),
 )
 def update_map_bars_by_bairro(selected_bairro: str | None, selected_bar_id: int | None, riders_ready: bool) -> dict:
-    """Atualiza os bares exibidos no mapa quando um bairro específico é filtrado."""
     if riders_ready and selected_bar_id is not None and SYSTEM.get_bar(int(selected_bar_id)) is not None:
-        # O bar selecionado já aparece na camada de destaque.
+        # o bar selecionado já aparece
         return {"type": "FeatureCollection", "features": []}
     if not selected_bairro:
         return ALL_BARS_GEOJSON
@@ -492,7 +476,6 @@ def update_map_bars_by_bairro(selected_bairro: str | None, selected_bar_id: int 
     prevent_initial_call=True,
 )
 def reset_search_filters(_n_clicks: int | None):
-    """Limpa bairro e texto da busca e restaura o raio padrão; o bar é limpo no dropdown."""
     return None, DEFAULT_SEARCH_RADIUS_KM, ""
 
 
@@ -514,22 +497,18 @@ def update_bar_dropdown(
     riders_ready: bool,
     current_value: int | None,
 ):
-    """Atualiza as opções do dropdown e seleciona o bar quando clicado no mapa."""
     triggered = ctx.triggered_id
     if not riders_ready or get_rider_generation_state()["running"] or not SYSTEM.riders:
         return INITIAL_DROPDOWN_OPTIONS, None
 
-    # 1. clique no botão de reset
     if triggered == "btn-reset-view":
         return INITIAL_DROPDOWN_OPTIONS, None
 
-    # 2. mudança no filtro de bairro
     if triggered == "bairro-dropdown":
         candidate_bars = BARS_BY_BAIRRO.get(selected_bairro, []) if selected_bairro else VALID_BARS
         options = [format_bar_option(b) for b in candidate_bars[:MAX_DROPDOWN_OPTIONS]]
         return options, None
 
-    # 3. clique em um marcador no mapa
     if triggered == "geojson-bares":
         clicked_bar = find_bar_from_click(geojson_click, SYSTEM, COORDS_INDEX, VALID_BARS)
         if clicked_bar is None:
@@ -542,7 +521,6 @@ def update_bar_dropdown(
 
         return options, clicked_bar.id
 
-    # 4. digitação na caixa de busca do dropdown (ou carregamento inicial)
     candidate_bars = BARS_BY_BAIRRO.get(selected_bairro, []) if selected_bairro else VALID_BARS
     options = filter_bar_options(
         search_value=search_value,
@@ -580,7 +558,6 @@ def update_map_and_details(
     selected_bairro: str | None,
     riders_ready: bool,
 ):
-    """Atualiza o bar selecionado, o círculo de raio, a busca de entregadores e a câmera."""
     triggered = ctx.triggered_id
     empty_discarded = {"type": "FeatureCollection", "features": []}
 
@@ -596,7 +573,6 @@ def update_map_and_details(
             empty_discarded,
         )
 
-    # 1. botão de visão geral / limpar filtro
     if triggered == "btn-reset-view":
         return (
             [],
@@ -607,7 +583,6 @@ def update_map_and_details(
             empty_discarded,
         )
 
-    # 2. mudança no filtro de bairro
     if triggered == "bairro-dropdown":
         if selected_bairro and selected_bairro in BARS_BY_BAIRRO:
             bars_bairro = BARS_BY_BAIRRO[selected_bairro]
@@ -630,9 +605,8 @@ def update_map_and_details(
             empty_discarded,
         )
 
-    # 3. nenhum bar selecionado (ou desmarcado)
     if selected_bar_id is None:
-        # Só restaura os pontos quando a seleção ou o bairro são limpos.
+        # só restaura os pontos quando a seleção ou o bairro são limpos
         map_url = dash.no_update
         if triggered in ("bar-dropdown", "bairro-dropdown"):
             map_url = get_all_riders_map_url()
@@ -656,7 +630,6 @@ def update_map_and_details(
             empty_discarded,
         )
 
-    # 4. validação do raio de atendimento informado na interface
     if radius_km is None or float(radius_km) <= 0:
         return (
             render_highlighted_bar_layer(bar),
@@ -672,7 +645,7 @@ def update_map_and_details(
     zoom_level = get_zoom_for_radius(radius_val)
     viewport = {"center": [bar.latitude, bar.longitude], "zoom": zoom_level, "transition": "flyTo"}
 
-    # 6. executa a busca na Trie (célula + adjacentes), filtra pelo raio e plota filtrados vs descartados clusterizados
+    # executa a busca na trie, filtra pelo raio e plota filtrados vs descartados
     ranking_by = ranking_criterion if ranking_criterion in ("time", "distance") else "time"
     search_result = search_and_build_riders_for_bar(SYSTEM, bar, radius_val, ranking_by=ranking_by)
 
@@ -719,12 +692,11 @@ def handle_generate_riders(
     num_riders: int | None,
     clear_existing: bool | None,
 ):
-    """Gerencia o início e a barra de progresso da geração de entregadores.
-    Ao iniciar uma nova geração, encerra imediatamente qualquer análise de raio de bar ativa.
-    """
+    "gerencia o início e a barra de progresso da geração de entregadores"
+
     triggered = ctx.triggered_id
 
-    # 1. clique no botão "Gerar Entregadores": inicia o job e cancela análise de bar anterior
+    # inicia o job e cancela anteriores
     if triggered == "btn-generate-riders":
         if num_riders is None or int(num_riders) <= 0:
             return (
@@ -770,7 +742,7 @@ def handle_generate_riders(
             False,
         )
 
-    # 2. atualização periódica da barra de progresso via dcc.Interval
+    # atualização periódica da barra de progresso 
     state = get_rider_generation_state()
     pct = state["percent"]
 
@@ -794,7 +766,6 @@ def handle_generate_riders(
             False,
         )
 
-    # 3. geração concluída: plota todos os novos entregadores no mapa sem prender o app em análise de bar
     return (
         state["map_url"],
         {"type": "FeatureCollection", "features": []},
@@ -830,7 +801,8 @@ def handle_generate_riders(
     prevent_initial_call="initial_duplicate",
 )
 def update_initialization_progress(_n_intervals: int | None):
-    """atualiza a barra de progresso da malha viária e kd-tree e habilita o botão ao concluir"""
+    "atualiza a barra de progresso da kd-tree e habilita o botão quando terminar"
+
     state = get_initialization_state()
     pct = state["percent"]
     message = state["message"]

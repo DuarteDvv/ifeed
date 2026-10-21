@@ -1,4 +1,4 @@
-"""Classe que representa um entregador (rider) no sistema de entrega"""
+"""Classe que representa um entregador no sistema de entrega"""
 
 class Rider:
     def __init__(self, id, latitude, longitude, geohash=None):

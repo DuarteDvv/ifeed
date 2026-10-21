@@ -1,4 +1,4 @@
-"""Funções e componentes de navegação no mapa e visualização de bares."""
+"""Funções e componentes de navegação no mapa e visualização de bares"""
 
 from dash import html
 import dash_bootstrap_components as dbc
@@ -21,7 +21,6 @@ BAR_CLUSTER_TO_LAYER = {"variable": "ifeed.barClusterToLayer"}
 
 
 def init_bar_catalog() -> DeliverySystem:
-    """Inicializa o catálogo de bares e estruturas de entregadores do DeliverySystem."""
     system = DeliverySystem.__new__(DeliverySystem)
     system.radix_tree = RadixTree()
     system.riders = {}
@@ -32,7 +31,7 @@ def init_bar_catalog() -> DeliverySystem:
 def build_bar_indices(
     valid_bars: list[Bar],
 ) -> tuple[dict[int, str], dict[str, list[Bar]], dict[tuple[float, float], int], list[dict]]:
-    """Gera índices em memória para busca textual, agrupamento por bairro e clique no mapa."""
+    
     search_index: dict[int, str] = {}
     bars_by_bairro: dict[str, list[Bar]] = {}
     coords_index: dict[tuple[float, float], int] = {}
@@ -53,14 +52,14 @@ def build_bar_indices(
 
 
 def get_bar_display_name(bar: Bar) -> str:
-    """Retorna o nome principal para exibição do bar."""
     if bar.nome_fantasia and bar.nome and bar.nome_fantasia != bar.nome:
         return f"{bar.nome_fantasia} ({bar.nome})"
     return bar.nome_fantasia or bar.nome or f"Bar #{bar.id}"
 
 
 def format_bar_option(bar: Bar) -> dict:
-    """Formata um objeto Bar como opção do dcc.Dropdown."""
+    "formata um objeto Bar como opção do dcc.dropdown"
+
     nome_curto = bar.nome_fantasia or bar.nome or f"Bar #{bar.id}"
     bairro_str = f" — {bar.bairro}" if bar.bairro else ""
     endereco_str = f" | {bar.endereco}" if bar.endereco else ""
@@ -71,7 +70,8 @@ def format_bar_option(bar: Bar) -> dict:
 
 
 def build_bars_geojson(bars: list[Bar]) -> dict:
-    """Converte uma lista de objetos Bar em um FeatureCollection GeoJSON para o dash-leaflet."""
+    "converte uma lista de bares em um featurecollection pro dash-leaflet"
+
     dicts = []
     for bar in bars:
         nome_exibicao = bar.nome_fantasia or bar.nome or f"Bar #{bar.id}"
@@ -96,25 +96,26 @@ def find_bar_from_click(
     coords_index: dict[tuple[float, float], int],
     valid_bars: list[Bar],
 ) -> Bar | None:
-    """Identifica o Bar clicado no mapa a partir do clickData do dl.GeoJSON."""
+    "identifica o bar clicado a partir do clickData"
+
     if not click_data:
         return None
 
-    # 1. tenta obter propriedades da Feature GeoJSON
+    # tenta obter propriedades da feature geoJSON
     props = click_data.get("properties") or {}
     if props.get("cluster"):
         return None
     if "bar_id" in props:
         return system.get_bar(int(props["bar_id"]))
 
-    # 2. tenta pelo ID direto da Feature
+    # tenta pelo ID direto da feature
     direct_id = click_data.get("id")
     if direct_id is not None and str(direct_id).isdigit():
         bar = system.get_bar(int(direct_id))
         if bar:
             return bar
 
-    # 3. tenta extrair coordenadas (GeoJSON geometry [lon, lat] ou latlng)
+    # tenta extrair coordenadas
     lat, lon = None, None
     geometry = click_data.get("geometry") or {}
     coords = geometry.get("coordinates")
@@ -130,7 +131,7 @@ def find_bar_from_click(
     if lat is None or lon is None:
         return None
 
-    # tentativa exata por coordenada arredondada
+    # tenta obter por coordenada arredondada
     exact_id = coords_index.get((round(float(lat), 6), round(float(lon), 6)))
     if exact_id is not None:
         return system.get_bar(exact_id)
@@ -148,7 +149,8 @@ def find_bar_from_click(
 
 
 def render_bar_details(bar: Bar | None) -> dbc.Card:
-    """Renderiza o card lateral com as informações do bar selecionado."""
+    "renderiza o card com as informações do bar"
+
     if bar is None:
         return dbc.Card(
             dbc.CardBody([
@@ -200,7 +202,6 @@ def render_bar_details(bar: Bar | None) -> dbc.Card:
 
 
 def get_zoom_for_radius(radius_km: float | None) -> int:
-    """Retorna um nível de zoom adequado para enquadrar o raio de atendimento no mapa."""
     if radius_km is None or radius_km <= 0:
         return 16
     if radius_km <= 0.4:
@@ -218,7 +219,8 @@ def render_highlighted_bar_layer(
     bar: Bar | None,
     radius_meters: float | None = None,
 ) -> list:
-    """Cria a camada de destaque no mapa para o bar selecionado e seu raio de atendimento."""
+    "cria a camada de destaque no mapa pro bar selecionado e seu raio"
+
     if bar is None or bar.latitude is None or bar.longitude is None:
         return []
 
@@ -241,7 +243,7 @@ def render_highlighted_bar_layer(
         )
 
     layers.extend([
-        # halo pulsante de destaque ao redor do bar selecionado
+        # halo de destaque ao redor do bar
         dl.CircleMarker(
             center=position,
             radius=18,
@@ -286,8 +288,9 @@ def filter_bar_options(
     current_value: int | None = None,
     system: DeliverySystem | None = None,
 ) -> list[dict]:
-    """Filtra as opções de bares com base na consulta e garante que o bar selecionado esteja presente."""
-    query = norm(search_value) if search_value else ""
+    "filtra as opções de bares com base na consulta e garante que o bar selecionado esteja presente"
+
+    query = norm(search_value)
 
     if not query:
         matched = candidate_bars[:max_options]

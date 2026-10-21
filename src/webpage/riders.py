@@ -1,4 +1,4 @@
-"""Funções e componentes da interface web para geração e exibição de entregadores."""
+"""Funções e componentes da interface web para geração e exibição de entregadores"""
 
 import threading
 import time
@@ -41,7 +41,7 @@ RIDER_CLUSTER_TO_LAYER = {"variable": "ifeed.riderClusterToLayer"}
 RIDER_DISCARDED_CLUSTER_TO_LAYER = {"variable": "ifeed.riderDiscardedClusterToLayer"}
 RIDER_POINT_TO_LAYER = {"variable": "ifeed.riderPointToLayer"}
 
-# estado global thread-safe para o carregamento inicial da malha viária e kd-tree
+# estado global pro carregamento inicial da malha viária e kd-tree
 _INIT_LOCK = threading.Lock()
 _INIT_STATE: dict[str, Any] = {
     "running": False,
@@ -50,7 +50,7 @@ _INIT_STATE: dict[str, Any] = {
     "ready": False,
 }
 
-# estado global thread-safe para acompanhamento da barra de progresso
+# estado global para acompanhamento da barra de progresso
 _PROGRESS_LOCK = threading.Lock()
 _GENERATION_STATE: dict[str, Any] = {
     "running": False,
@@ -66,13 +66,13 @@ _GENERATION_STATE: dict[str, Any] = {
 
 
 def get_initialization_state() -> dict[str, Any]:
-    """retorna uma cópia thread-safe do estado atual de inicialização da malha viária e kd-tree"""
+    "retorna uma cópia thread-safe do estado atual de inicialização da malha viária e kd-tree"
     with _INIT_LOCK:
         return dict(_INIT_STATE)
 
 
 def is_initialization_ready() -> bool:
-    """informa se o carregamento da malha viária e a kd-tree já foram concluídos"""
+    "informa se o carregamento da malha viária e a kd-tree já foram concluídos"
     with _INIT_LOCK:
         return bool(_INIT_STATE["ready"])
 
@@ -91,17 +91,18 @@ def _set_init_state(
 
 
 def _run_initialization_worker(system: DeliverySystem | None = None) -> None:
-    """executa em segundo plano o carregamento da malha viária e a montagem da kd-tree"""
+    "executa em segundo plano o carregamento da malha viária e a montagem da kd-tree"
+
     try:
-        # 1. carregamento e leitura dos pontos de segmentação
+        # carregamento e leitura dos pontos de segmentação
         _set_init_state(percent=10, message="Lendo segmentos de ruas (data/segmentos_ruas_bh.csv.gz)...")
         load_segmentation_points()
 
-        # 2. montagem da kd-tree com os pontos segmentados
+        # montagem da kd-tree com os pontos segmentados
         _set_init_state(percent=35, message="Montando KD-Tree das ruas (181.103 nós)...")
         get_segments_kdtree()
 
-        # 3. carregamento do grafo da malha viária de bh com animação suave de progresso
+        # carregamento do grafo da malha viária de bh com animação suave de progresso
         _set_init_state(percent=55, message="Carregando malha viária de BH (data/malha_viaria_bh.graphml)...")
 
         stop_ticker = threading.Event()
@@ -123,11 +124,11 @@ def _run_initialization_worker(system: DeliverySystem | None = None) -> None:
         if system is not None:
             system.road_network = road_network
 
-        # 4. extração e indexação das geometrias das ruas
+        # extração e indexação das geometrias das ruas
         _set_init_state(percent=90, message="Indexando geometrias das ruas...")
         get_street_geometries(road_network=road_network)
 
-        # 5. inicialização concluída
+        # inicialização concluída
         _set_init_state(
             percent=100,
             message="Malha viária e KD-Tree carregadas com sucesso!",
@@ -144,7 +145,8 @@ def _run_initialization_worker(system: DeliverySystem | None = None) -> None:
 
 
 def start_initialization_job(system: DeliverySystem | None = None) -> None:
-    """inicia o carregamento da malha viária e a montagem da kd-tree em segundo plano"""
+    "inicia o carregamento da malha viária e a montagem da kd-tree em segundo plano"
+
     with _INIT_LOCK:
         if _INIT_STATE["running"] or _INIT_STATE["ready"]:
             return
@@ -170,7 +172,7 @@ def generate_and_store_riders(
     std_dev_meters: float = DEFAULT_STD_DEV_METERS,
     seed: int | None = None,
 ) -> list[Rider]:
-    """Gera entregadores utilizando DeliverySystem.generate_riders()."""
+
     if num_riders is None or int(num_riders) <= 0:
         return []
 
@@ -183,7 +185,6 @@ def generate_and_store_riders(
 
 
 def format_estimated_time(minutes: float | None, is_ready: bool = True) -> str:
-    """Formata o tempo estimado em minutos para exibição amigável."""
     if minutes is None:
         return "Calculando..." if not is_ready else "Sem rota"
     if minutes < 1.0:
@@ -197,7 +198,6 @@ def format_estimated_time(minutes: float | None, is_ready: bool = True) -> str:
 
 
 def format_road_distance(meters: float | None) -> str:
-    """Formata a distância viária em metros para exibição amigável."""
     if meters is None:
         return "N/A"
     if meters < 1000:
@@ -213,7 +213,8 @@ def build_rider_feature(
     estimated_time_minutes: float | None = None,
     ranking_by: str = "time",
 ) -> dict[str, Any]:
-    """Converte um Rider em uma Feature GeoJSON contendo apenas dados numéricos e primitivos."""
+    "converte um entregador em uma feature geoJSON contendo apenas dados numéricos e primitivos"
+
     props: dict[str, Any] = {
         "id": rider.id,
         "geohash": rider.geohash,
@@ -239,7 +240,8 @@ def build_rider_feature(
 
 
 def build_riders_geojson(riders: Iterable[Rider]) -> dict[str, Any]:
-    """Converte uma coleção de entregadores em um FeatureCollection GeoJSON para clusterização."""
+    "converte uma coleção de entregadores em um FeatureCollection"
+
     features = [
         build_rider_feature(rider, status="normal")
         for rider in riders
@@ -254,14 +256,12 @@ def search_and_build_riders_for_bar(
     radius_km: float,
     ranking_by: str = "time",
 ) -> dict[str, Any]:
-    """Busca entregadores na Trie (célula do bar + 8 adjacentes), filtra pelo raio,
-    calcula rotas na malha viária e monta o GeoJSON ordenado por tempo de trajeto ou distância.
-    """
+    "busca entregadores na trie, filtra pelo raio, calcula rotas e monta o geoJSON"
+
     radius_meters = float(radius_km) * 1000.0
     bar_geohash = bar.geohash or geohash_encode(bar.latitude, bar.longitude, size=8)
     prefix_size = select_geohash_prefix_size(radius_meters)
 
-    # 1. busca na RadixTree pela célula do bar e as 8 células adjacentes em O(m + k)
     candidate_ids = search_candidates(system.radix_tree, bar_geohash, prefix_size=prefix_size)
     candidates = [
         system.get_rider(cid)
@@ -269,12 +269,10 @@ def search_and_build_riders_for_bar(
         if system.get_rider(cid) is not None
     ]
 
-    # 2. classificação por distância geométrica (Haversine) e filtragem por raio
     restaurant_location = (bar.latitude, bar.longitude)
     classified = classify_candidates_by_distance(candidates, restaurant_location, radius_meters)
     filtered = filter_candidates_by_radius(classified)
 
-    # 3. se houver malha viária carregada, calcula distância pelas ruas e tempo de trajeto
     road_network = getattr(system, "road_network", None)
     if road_network is not None and filtered:
         try:
@@ -282,7 +280,6 @@ def search_and_build_riders_for_bar(
         except Exception as err:
             print(f"Aviso no cálculo de rotas OSM: {err}")
 
-    # 4. ordenação conforme critério escolhido: tempo de trajeto (default) ou distância
     if ranking_by == "time":
         filtered.sort(
             key=lambda c: (
@@ -296,8 +293,7 @@ def search_and_build_riders_for_bar(
 
     filtered_by_id = {c["id"]: c for c in filtered}
 
-    # 5. construção das Features GeoJSON: apenas candidatos da região (Trie)
-    # filtrados em destaque (laranja) e descartados da vizinhança em cinza
+    # constroi as features json
     filtered_features: list[dict[str, Any]] = []
     for info in filtered:
         rider = system.get_rider(info["id"])
@@ -360,7 +356,6 @@ def search_and_build_riders_for_bar(
 
 
 def _render_fallback_ranking_radio(value: str = "time") -> html.Div:
-    """Renderiza um componente de rádio oculto para manter o ID persistente no DOM do Dash."""
     return html.Div(
         dbc.RadioItems(
             id="radio-ranking-criterion",
@@ -380,7 +375,6 @@ def render_nearby_search_results(
     total_system_riders: int = 0,
     invalid_radius: bool = False,
 ):
-    """Renderiza o painel sobre o mapa com o resultado da busca de entregadores no raio de atendimento."""
     if invalid_radius:
         return html.Div([
             dbc.Alert(
@@ -517,7 +511,6 @@ def render_nearby_search_results(
 
 
 def render_rider_marker(rider: Rider) -> dl.CircleMarker:
-    """Cria o marcador visual (CircleMarker) de um entregador para exibição no mapa."""
     return dl.CircleMarker(
         id=f"rider-marker-{rider.id}",
         center=[rider.latitude, rider.longitude],
@@ -540,12 +533,10 @@ def render_rider_marker(rider: Rider) -> dl.CircleMarker:
 
 
 def render_riders_layer(riders: Iterable[Rider]) -> list[dl.CircleMarker]:
-    """Converte os entregadores existentes em marcadores do dash-leaflet."""
     return [render_rider_marker(rider) for rider in riders]
 
 
 def get_rider_generation_state() -> dict[str, Any]:
-    """Retorna uma cópia thread-safe do estado atual de geração de entregadores."""
     with _PROGRESS_LOCK:
         return dict(_GENERATION_STATE)
 
@@ -556,7 +547,8 @@ def _run_generation_worker(
     clear_existing: bool,
     std_dev_meters: float,
 ) -> None:
-    """Executa a geração de entregadores em lotes atualizando o progresso."""
+    "executa a geração de entregadores"
+
     num_batches = min(MAX_GENERATION_BATCHES, max(1, num_riders))
     base_batch = num_riders // num_batches
     remainder = num_riders % num_batches
@@ -628,7 +620,8 @@ def start_rider_generation_job(
     clear_existing: bool = True,
     std_dev_meters: float = DEFAULT_STD_DEV_METERS,
 ) -> None:
-    """Inicia a geração de entregadores em segundo plano para alimentar a barra de progresso."""
+    "inicia a geração de entregadores em segundo pra alimentar a barra de progresso"
+
     with _PROGRESS_LOCK:
         if _GENERATION_STATE["running"]:
             return
@@ -656,7 +649,7 @@ def render_riders_status(
     total_riders: int,
     invalid_input: bool = False,
 ) -> html.Div:
-    """Renderiza o indicador de quantidade de entregadores ativos no mapa."""
+    
     children: list[Any] = [
         dbc.Badge(
             f"{total_riders:,} entregadores no mapa".replace(",", "."),
@@ -678,7 +671,6 @@ def render_riders_status(
 
 
 def render_initialization_progress() -> html.Div:
-    """renderiza a barra de progresso exibida durante o carregamento inicial da malha e kd-tree"""
     ready = is_initialization_ready()
     return html.Div(
         id="init-progress-container",
@@ -720,7 +712,6 @@ def render_initialization_progress() -> html.Div:
 
 
 def render_riders_controls(initial_total: int = 0, is_ready: bool | None = None) -> html.Div:
-    """Renderiza a seção de controles e barra de progresso para geração de entregadores."""
     if is_ready is None:
         is_ready = is_initialization_ready()
 
@@ -759,7 +750,7 @@ def render_riders_controls(initial_total: int = 0, is_ready: bool | None = None)
             title="" if is_ready else "Aguarde até que o carregamento do mapa esteja concluído.",
             className="w-100 fw-semibold mb-2",
         ),
-        # mensagem informativa exibida enquanto o mapa e a kd-tree estão sendo carregados
+        # mensagem exibida enquanto o mapa e a kd-tree estao sendo carregados
         html.Div(
             id="rider-init-warning",
             children="Aguarde até que o carregamento do mapa esteja concluído.",

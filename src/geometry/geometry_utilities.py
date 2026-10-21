@@ -1,4 +1,4 @@
-"""Módulo centralizado de utilidades de geometria computacional e espacial."""
+"""Módulo de utilidades de geometria computacional e espacial"""
 
 import math
 import numpy as np
@@ -25,12 +25,11 @@ __all__ = [
 
 
 def hypot(dx, dy):
-    "calcula a hipotenusa sqrt(dx^2 + dy^2)"
+    "calcula a hipotenusa"
     return math.sqrt(dx * dx + dy * dy)
 
 
 def squared_distance(coord_a, coord_b):
-    "calcula a distância euclidiana ao quadrado entre dois pontos"
     if len(coord_a) == 2 and len(coord_b) == 2:
         dx = coord_a[0] - coord_b[0]
         dy = coord_a[1] - coord_b[1]
@@ -39,7 +38,7 @@ def squared_distance(coord_a, coord_b):
 
 
 def project_point_on_segment(point, seg_start, seg_end):
-    "calcula a projeção ortogonal de um ponto sobre um segmento de reta"
+    "calcula a projeção ortogonal de um ponto sobre um segmento"
     px, py = point
     x1, y1 = seg_start
     x2, y2 = seg_end
@@ -47,10 +46,6 @@ def project_point_on_segment(point, seg_start, seg_end):
     dx = x2 - x1
     dy = y2 - y1
     seg_len_sq = dx * dx + dy * dy
-
-    # se os extremos do segmento coincidirem, retorna a própria extremidade
-    if seg_len_sq == 0.0:
-        return (float(x1), float(y1))
 
     # parâmetro escalar t da projeção vetorial restrito ao intervalo [0, 1]
     t = ((px - x1) * dx + (py - y1) * dy) / seg_len_sq
